@@ -8,16 +8,17 @@ const $  = (sel) => document.querySelector(sel);
 const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
 // === Constants ===
-const DEPOSIT_MAP = {
-  "petfles": 0.25,
-  "glas": 0.10,
-  "blikje": 0.15
-};
+const DEPOSIT_MAP = { petfles: 0.25, glas: 0.10, blikje: 0.15 };
 
 // === Lifecycle ===
 document.addEventListener("DOMContentLoaded", async () => {
-  await loadProducts();
-  await refreshTables();
+  try {
+    await loadProducts();
+    await refreshTables();
+  } catch (e) {
+    console.error(e);
+    toast("❌ Fout bij laden voorraad");
+  }
 
   // events
   $("#btn-add-batch").addEventListener("click", addBatch);
@@ -33,7 +34,7 @@ async function loadProducts(){
     .select("id, name")
     .order("name", { ascending:true });
 
-  if(error){ console.error(error); return; }
+  if(error){ console.error(error); toast("❌ Kon producten niet laden"); return; }
 
   const opts = [`<option value="">— Kies product —</option>`]
     .concat((products||[]).map(p => `<option value="${p.id}">${esc(p.name)}</option>`))
@@ -51,8 +52,9 @@ function showCalcHint(){
 
   if(qty > 0 && total >= 0){
     const base = total / qty;
-    const piece = base + depVal;
-    $("#calc-hint").textContent = `Indicatie verkoopprijs/stuk: ${euro(piece)} (basis €${base.toFixed(2).replace(".", ",")} + statiegeld €${depVal.toFixed(2).replace(".", ",")})`;
+    const piece = Math.max(0, base + depVal);
+    $("#calc-hint").textContent =
+      `Indicatie verkoopprijs/stuk: ${euro(piece)} (basis €${base.toFixed(2).replace(".", ",")} + statiegeld €${depVal.toFixed(2).replace(".", ",")})`;
   }else{
     $("#calc-hint").textContent = "";
   }
@@ -70,16 +72,14 @@ async function addBatch(){
   if(!(qty > 0)) return toast("⚠️ Vul een geldig aantal in");
   if(!(total >= 0)) return toast("⚠️ Vul een geldige totaalprijs in");
 
-  const pricePerPiece = (total / qty) + depVal;
+  const pricePerPiece = Math.max(0, (total / qty) + depVal);
 
-  // Optioneel: batch_date server-side default NOW()
   const payload = {
     product_id: productId,
     quantity: qty,
     price_per_piece: round2(pricePerPiece),
-    deposit_type: depType || null,   // text kolom
-    deposit_value: depVal || 0,      // numeric kolom
-    // buffer_used: 0,                // voeg toe als je kolom hebt
+    deposit_type: depType || null,   // optioneel
+    deposit_value: depVal || 0       // optioneel
   };
 
   const { error } = await supabase.from("stock_batches").insert([payload]);
@@ -93,8 +93,6 @@ async function addBatch(){
   $("#calc-hint").textContent = "";
 
   await refreshTables();
-
-  // Belangrijk: update products-prijs naar FIFO (oudste batch)
   await updateProductsPriceFromFIFO(productId);
 }
 
@@ -107,21 +105,21 @@ async function refreshTables(){
 async function loadActiveBatches(){
   const { data, error } = await supabase
     .from("stock_batches")
-    .select("id, product_id, quantity, price_per_piece, deposit_type, deposit_value, buffer_used, batch_date, products(name)")
+    .select("id, product_id, quantity, price_per_piece, deposit_type, deposit_value, created_at, products(name)")
     .gt("quantity", 0)
-    .order("batch_date", { ascending: true })
+    .order("created_at", { ascending: true })
     .order("id", { ascending: true }); // fallback
 
-  if(error){ console.error(error); return; }
+  if(error){ console.error(error); toast("❌ Kon batches niet laden"); return; }
 
   const rows = (data||[]).map(b => `
     <tr>
       <td>${esc(b.products?.name || "Onbekend")}</td>
-      <td>${formatDate(b.batch_date)}</td>
+      <td>${formatDate(b.created_at)}</td>
       <td>${b.quantity}</td>
       <td>${euro(b.price_per_piece)}</td>
       <td>${formatDeposit(b.deposit_type, b.deposit_value)}</td>
-      <td>${b.buffer_used != null ? euro(b.buffer_used) : "—"}</td>
+      <td>—</td>
       <td>
         <button class="btn btn-warn" onclick="deleteBatch('${b.id}', '${b.product_id}')">🗑️ Verwijderen</button>
       </td>
@@ -138,7 +136,7 @@ async function loadStockPerProduct(){
     .select("product_id, quantity, products(name)")
     .gt("quantity", 0);
 
-  if(error){ console.error(error); return; }
+  if(error){ console.error(error); toast("❌ Kon voorraad niet laden"); return; }
 
   const map = {};
   (data||[]).forEach(r => {
@@ -169,16 +167,16 @@ async function deleteBatch(id, productId){
 async function updateProductsPriceFromFIFO(productId){
   const { data: batches, error } = await supabase
     .from("stock_batches")
-    .select("price_per_piece")
+    .select("price_per_piece, created_at")
     .eq("product_id", productId)
     .gt("quantity", 0)
-    .order("batch_date", { ascending: true })
+    .order("created_at", { ascending: true })
     .order("id", { ascending: true });
 
   if(error){ console.error(error); return; }
 
   if((batches||[]).length > 0){
-    const newPrice = batches[0].price_per_piece || 0;
+    const newPrice = Math.max(0, batches[0].price_per_piece || 0);
     await supabase.from("products").update({ price: newPrice }).eq("id", productId);
   }
 }
@@ -193,7 +191,7 @@ function formatDate(iso){
 }
 function formatDeposit(type, val){
   if(!type) return "—";
-  return `${type} (${euro(val)})`;
+  return `${type} (${euro(val||0)})`;
 }
 function toast(msg){
   const el = document.createElement("div");
