@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Turf Lijst – Admin</title>
+
+  <!-- Favicon + Styles -->
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="../favicon.ico">
+  <link rel="stylesheet" href="../css/app.css" />
+
+  <!-- Supabase + page script -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="../js/admin.page.js"></script>
+</head>
+<body class="bg-train">
+  <div class="content-wrapper">
+    <h1>🔐 Admin Dashboard</h1>
+
+    <!-- Navigatie -->
+    <div style="margin-bottom:6px">
+      <button class="btn" onclick="location.href='/'">🏠 Terug naar start</button>
+      <button class="btn" onclick="location.href='/pages/finance.html'">📊 Finance</button>
+      <button class="btn" onclick="location.href='/pages/stock.html'">📦 Voorraad</button>
+    </div>
+
+    <!-- Gebruikersbeheer -->
+    <h2>Gebruikersbeheer</h2>
+    <table class="table">
+      <thead><tr><th>Naam</th><th>Totaalbedrag (€)</th><th>Drankjes</th><th>Acties</th></tr></thead>
+      <tbody id="tbl-users"></tbody>
+    </table>
+
+    <!-- Productbeheer -->
+    <h2>Productbeheer</h2>
+    <div style="margin-bottom:10px">
+      <input type="text" id="new-product-name" class="select" placeholder="Productnaam" />
+      <input type="number" id="new-product-price" class="select" step="0.01" min="0" placeholder="Prijs (€)" />
+      <button class="btn" id="btn-add-product">➕ Product toevoegen</button>
+    </div>
+    <table class="table">
+      <thead><tr><th>Naam</th><th>Prijs (€)</th><th>Acties</th></tr></thead>
+      <tbody id="tbl-products"></tbody>
+    </table>
+  </div>
+</body>
+</html>

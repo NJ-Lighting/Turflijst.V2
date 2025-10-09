@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Turf Lijst – Finance</title>
+
+  <!-- Favicon + Styles (let op: één map omhoog vanuit /pages) -->
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="../favicon.ico">
+  <link rel="stylesheet" href="../css/app.css" />
+
+  <!-- Supabase + page script -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="../js/finance.page.js"></script>
+</head>
+<body class="bg-train">
+  <div class="content-wrapper">
+    <h1>📊 Finance</h1>
+
+    <!-- Nav -->
+    <div style="margin-bottom:6px">
+      <button class="btn" onclick="location.href='/'">🏠 Terug naar start</button>
+      <button class="btn" onclick="location.href='/pages/history.html'">📜 Geschiedenis</button>
+      <button class="btn" onclick="location.href='/pages/admin.html'">🔐 Admin</button>
+    </div>
+
+    <!-- KPI's -->
+    <h2>Overzicht</h2>
+    <table class="table">
+      <tbody>
+        <tr><th style="width:50%">Totale voorgeschoten bedrag</th><td id="kpi-advanced">€0,00</td></tr>
+        <tr><th>Totale waarde in koelkast (voorraad)</th><td id="kpi-fridge">€0,00</td></tr>
+        <tr><th>Statiegeld in omloop</th><td id="kpi-deposit-circulation">€0,00</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Verkoop per product -->
+    <h2>Verkochte blikjes per product</h2>
+    <table class="table">
+      <thead><tr><th>Product</th><th>Aantal</th></tr></thead>
+      <tbody id="tbl-sold-per-product"></tbody>
+    </table>
+
+    <!-- Betalingen registreren -->
+    <h2>Betaling registreren</h2>
+    <div>
+      <label for="pay-user">Gebruiker</label><br />
+      <select id="pay-user" class="select"></select>
+      <br />
+      <label for="pay-amount">Bedrag (€)</label><br />
+      <input id="pay-amount" class="select" type="number" step="0.01" min="0" placeholder="0,00" />
+      <br />
+      <button class="btn" id="btn-add-payment">➕ Registreren</button>
+    </div>
+
+    <!-- Betalingen lijst + filter -->
+    <h2>Betalingen</h2>
+    <div>
+      <label for="filter-user">Filter op gebruiker</label><br />
+      <select id="filter-user" class="select"></select>
+    </div>
+    <table class="table">
+      <thead><tr><th>Datum</th><th>Gebruiker</th><th>Bedrag (€)</th></tr></thead>
+      <tbody id="tbl-payments"></tbody>
+    </table>
+
+  </div>
+</body>
+</html>

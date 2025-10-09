@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Turf Lijst – Nieuwe gebruiker</title>
+
+  <!-- Favicon + Styles (één map omhoog vanaf /pages) -->
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="../favicon.ico">
+  <link rel="stylesheet" href="../css/app.css" />
+
+  <!-- Supabase + page script -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="../js/new-user.page.js"></script>
+</head>
+<body class="bg-train">
+  <div class="content-wrapper">
+    <h1>👤 Nieuwe gebruiker</h1>
+
+    <!-- Navigatie -->
+    <div style="margin-bottom:6px">
+      <button class="btn" onclick="location.href='/'">🏠 Terug naar start</button>
+      <button class="btn" onclick="location.href='/pages/history.html'">📜 Geschiedenis</button>
+      <button class="btn" onclick="location.href='/pages/admin.html'">🔐 Admin</button>
+    </div>
+
+    <h2>Toevoegen</h2>
+    <div>
+      <label for="nu-name">Naam</label><br />
+      <input id="nu-name" class="select" type="text" placeholder="Naam" />
+
+      <label for="nu-phone">Telefoonnummer (alleen zichtbaar voor Admin)</label><br />
+      <input id="nu-phone" class="select" type="text" inputmode="tel" placeholder="06-..." />
+
+      <label for="nu-avatar">Avatar URL (optioneel)</label><br />
+      <input id="nu-avatar" class="select" type="url" placeholder="https://…/avatar.png" />
+
+      <button class="btn" id="nu-submit">➕ Gebruiker toevoegen</button>
+    </div>
+
+    <h2>Laatste 20 gebruikers</h2>
+    <table class="table">
+      <thead><tr><th>Naam</th><th>Telefoon</th></tr></thead>
+      <tbody id="nu-recent"></tbody>
+    </table>
+  </div>
+</body>
+</html>

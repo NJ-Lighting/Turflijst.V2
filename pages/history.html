@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Turf Lijst – Geschiedenis</title>
+
+  <!-- Favicon + Styles -->
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="../favicon.ico">
+  <link rel="stylesheet" href="../css/app.css" />
+
+  <!-- Supabase + page script -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="../js/history.page.js"></script>
+</head>
+<body class="bg-train">
+  <div class="content-wrapper">
+    <h1>📜 Geschiedenis</h1>
+
+    <!-- Navigatie -->
+    <div style="margin-bottom:6px">
+      <button class="btn" onclick="location.href='/'">🏠 Terug naar start</button>
+      <button class="btn" onclick="location.href='/pages/finance.html'">📊 Finance</button>
+      <button class="btn" onclick="location.href='/pages/admin.html'">🔐 Admin</button>
+    </div>
+
+    <!-- Filters -->
+    <h2>Filter</h2>
+    <div>
+      <label for="h-user">Gebruiker</label><br />
+      <select id="h-user" class="select"></select>
+
+      <label for="h-from">Vanaf</label><br />
+      <input id="h-from" class="select" type="date" />
+
+      <label for="h-to">Tot en met</label><br />
+      <input id="h-to" class="select" type="date" />
+
+      <button class="btn" id="h-apply">🔎 Toepassen</button>
+    </div>
+
+    <!-- Overzicht -->
+    <h2>Log</h2>
+    <table class="table">
+      <thead><tr><th>Datum/Tijd</th><th>Gebruiker</th><th>Drankje</th><th>Prijs (€)</th></tr></thead>
+      <tbody id="h-rows"></tbody>
+    </table>
+
+    <!-- Totaal -->
+    <h2>Totaal in selectie</h2>
+    <table class="table">
+      <tbody><tr><th style="width:50%">Som bedragen</th><td id="h-sum">€0,00</td></tr></tbody>
+    </table>
+  </div>
+</body>
+</html>

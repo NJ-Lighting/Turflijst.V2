@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Turf Lijst – Voorraad</title>
+
+  <!-- Favicon + Styles (één map omhoog vanaf /pages) -->
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="../favicon.ico">
+  <link rel="stylesheet" href="../css/app.css" />
+
+  <!-- Supabase + page script -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="../js/stock.page.js"></script>
+</head>
+<body class="bg-train">
+  <div class="content-wrapper">
+    <h1>📦 Voorraadbeheer</h1>
+
+    <!-- Navigatie -->
+    <div style="margin-bottom:6px">
+      <button class="btn" onclick="location.href='/'">🏠 Terug naar start</button>
+      <button class="btn" onclick="location.href='/pages/admin.html'">🔐 Admin</button>
+      <button class="btn" onclick="location.href='/pages/finance.html'">📊 Finance</button>
+    </div>
+
+    <!-- Nieuwe batch toevoegen -->
+    <h2>Nieuwe batch toevoegen</h2>
+    <div>
+      <label for="batch-product">Product</label><br />
+      <select id="batch-product" class="select"></select>
+
+      <label for="batch-qty">Aantal stuks</label><br />
+      <input id="batch-qty" type="number" class="select" min="1" step="1" placeholder="0" />
+
+      <label for="batch-total">Totaalprijs inkoop (€)</label><br />
+      <input id="batch-total" type="number" class="select" min="0" step="0.01" placeholder="0,00" />
+
+      <label for="batch-deposit-type">Statiegeld</label><br />
+      <select id="batch-deposit-type" class="select">
+        <option value="">— Geen —</option>
+        <option value="petfles">PET-fles (€0,25)</option>
+        <option value="glas">Glazen fles (€0,10)</option>
+        <option value="blikje">Blikje (€0,15)</option>
+      </select>
+
+      <button class="btn" id="btn-add-batch">➕ Batch toevoegen</button>
+      <div style="margin-top:8px" id="calc-hint" class="muted"></div>
+    </div>
+
+    <!-- Overzicht batches (alleen > 0) -->
+    <h2>Actieve batches (FIFO)</h2>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Product</th>
+          <th>Batch-datum</th>
+          <th>Aantal</th>
+          <th>Prijs/stuk (€)</th>
+          <th>Statiegeld</th>
+          <th>Korting via buffer</th>
+          <th>Acties</th>
+        </tr>
+      </thead>
+      <tbody id="tbl-batches"></tbody>
+    </table>
+
+    <!-- Voorraad per product -->
+    <h2>Voorraad per product</h2>
+    <table class="table">
+      <thead><tr><th>Product</th><th>Totale voorraad</th></tr></thead>
+      <tbody id="tbl-stock-per-product"></tbody>
+    </table>
+  </div>
+</body>
+</html>
