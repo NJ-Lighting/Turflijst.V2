@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Turf Lijst</title>
+  <link rel="stylesheet" href="/css/app.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script type="module" src="/js/index.page.js"></script>
+</head>
+<body class="bg-train">
+  <div class="content-wrapper">
+    <h1>🍺 Turf Lijst</h1>
+    <h2>Log een Drankje</h2>
+
+    <label>Gebruiker:</label>
+    <select id="user" class="select"></select>
+
+    <h2>Kies een Drankje</h2>
+    <div id="product-buttons" class="product-grid"></div>
+
+    <button class="btn btn-warn block" onclick="undoLastDrink()">⏪ Undo Laatste Drankje</button>
+
+    <h2>💰 Totaal Te Betalen</h2>
+    <table class="table">
+      <thead><tr><th>Gebruiker</th><th>Bedrag (€)</th></tr></thead>
+      <tbody id="totalToPayList"></tbody>
+    </table>
+
+    <h2>🥤 Drankjes per Gebruiker</h2>
+    <table class="table">
+      <tbody id="userDrinkTotalsTable"></tbody>
+    </table>
+
+    <h2>🔗 Navigatie</h2>
+    <div>
+      <button class="btn" onclick="location.href='/new-user.html'">👤 Gebruiker Toevoegen</button>
+      <button class="btn" onclick="location.href='/history.html'">📜 Geschiedenis Bekijken</button>
+      <button class="btn" onclick="checkAdminPin()">🔐 Ga naar Admin Pagina</button>
+    </div>
+  </div>
+</body>
+</html>
