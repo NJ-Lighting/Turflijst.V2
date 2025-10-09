@@ -44,23 +44,30 @@ async function loadUsers() {
 }
 
 async function loadProducts() {
-  let { data: products, error } = await supabase.from("products").select("*");
+  const { data: products, error } = await supabase.from("products").select("*");
   if (error) return console.error("Error loading products:", error);
 
-  let { data: stock, error: stockError } = await supabase
+  const { data: stock, error: stockError } = await supabase
     .from("stock_batches")
     .select("product_id, quantity")
     .gt("quantity", 0);
   if (stockError) return console.error("Error loading stock:", stockError);
 
   const stockMap = {};
-  (stock || []).forEach(b => { stockMap[b.product_id] = (stockMap[b.product_id] || 0) + (b.quantity || 0); });
+  (stock || []).forEach(b => {
+    stockMap[b.product_id] = (stockMap[b.product_id] || 0) + (b.quantity || 0);
+  });
 
   const container = document.getElementById("product-buttons");
   container.innerHTML = "";
 
-  const gridWrapper = document.createElement("div");
-  gridWrapper.className = "product-grid-inner";
+  const grid = document.createElement("div");
+  grid.style.display = "grid";
+  grid.style.gridTemplateColumns = "repeat(auto-fill, minmax(200px, 1fr))";
+  grid.style.gap = "20px";
+  grid.style.width = "100%";
+  grid.style.maxWidth = "600px";
+  grid.style.margin = "0 auto";
 
   (products || []).forEach(p => {
     const voorraad = stockMap[p.id] || 0;
@@ -78,19 +85,10 @@ async function loadProducts() {
         <div>€${p.price.toFixed(2).replace(".", ",")}</div>
       </div>
     `;
-    gridWrapper.appendChild(button);
+    grid.appendChild(button);
   });
 
-  // wrapper in outer container
-  const outer = document.createElement("div");
-  outer.style.display = "grid";
-  outer.style.gridTemplateColumns = "repeat(auto-fill, minmax(200px, 1fr))";
-  outer.style.gap = "20px";
-  outer.style.width = "100%";
-  outer.style.maxWidth = "600px";
-  outer.style.margin = "0 auto";
-  while (gridWrapper.firstChild) outer.appendChild(gridWrapper.firstChild);
-  container.appendChild(outer);
+  container.appendChild(grid);
 }
 
 async function logDrink(product_id) {
@@ -108,7 +106,7 @@ async function logDrink(product_id) {
     .gt("quantity", 0)
     .order("created_at", { ascending: true });
 
-  if (!batchError && (batches||[]).length > 0) {
+  if (!batchError && (batches || []).length > 0) {
     await updateProductPriceFromOldestBatch(product_id);
     let remaining = 1;
     for (const batch of batches) {
@@ -136,7 +134,7 @@ async function updateProductPriceFromOldestBatch(productId) {
     .gt("quantity", 0)
     .order("created_at", { ascending: true });
 
-  if (!error && (batches||[]).length > 0) {
+  if (!error && (batches || []).length > 0) {
     const newPrice = batches[0].price_per_piece;
     await supabase.from("products").update({ price: newPrice }).eq("id", productId);
     await loadProducts();
@@ -156,22 +154,21 @@ async function undoLastDrink() {
 async function loadTotalToPay() {
   const { data: totals } = await supabase.from("drinks").select("user_id, users(name), products(price)");
   const totalByUser = {};
-  (totals||[]).forEach(drink => {
+  (totals || []).forEach(drink => {
     const name = drink.users?.name || "Onbekend";
     const price = drink.products?.price || 0;
     totalByUser[name] = (totalByUser[name] || 0) + price;
   });
-  const sorted = Object.entries(totalByUser).sort((a,b)=> a[0].localeCompare(b[0]));
-  document.getElementById("totalToPayList").innerHTML = sorted
-    .map(([name, amount]) => `<tr><td>${name}</td><td>€${amount.toFixed(2).replace('.', ',')}</td></tr>`)
-    .join("");
+  const sorted = Object.entries(totalByUser).sort((a, b) => a[0].localeCompare(b[0]));
+  document.getElementById("totalToPayList").innerHTML =
+    sorted.map(([name, amount]) => `<tr><td>${name}</td><td>€${amount.toFixed(2).replace('.', ',')}</td></tr>`).join("");
 }
 
 async function loadUserDrinkTotals() {
   const { data: drinks } = await supabase.from("drinks").select("user_id, users(name), products(name)");
   const users = {};
   const drinkNames = new Set();
-  (drinks||[]).forEach(drink => {
+  (drinks || []).forEach(drink => {
     const name = drink.users?.name || "Onbekend";
     const drinkName = drink.products?.name || "Onbekend";
     users[name] = users[name] || {};
@@ -179,25 +176,25 @@ async function loadUserDrinkTotals() {
     drinkNames.add(drinkName);
   });
   const headers = [...drinkNames].sort();
-  const headerRow = `<tr><th>Gebruiker</th>${headers.map(d=>`<th>${d}</th>`).join('')}</tr>`;
+  const headerRow = `<tr><th>Gebruiker</th>${headers.map(d => `<th>${d}</th>`).join('')}</tr>`;
   const rows = Object.entries(users)
-    .sort((a,b)=> a[0].localeCompare(b[0]))
-    .map(([user, ds]) => `<tr><td>${user}</td>${headers.map(d=>`<td>${ds[d]||0}</td>`).join('')}</tr>`)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([user, ds]) => `<tr><td>${user}</td>${headers.map(d => `<td>${ds[d] || 0}</td>`).join('')}</tr>`)
     .join("");
   document.getElementById("userDrinkTotalsTable").innerHTML = headerRow + rows;
 }
 
-function showToast(msg){
+function showToast(msg) {
   const toast = document.createElement("div");
   toast.className = "toast";
   toast.innerText = msg;
   document.body.appendChild(toast);
-  setTimeout(()=>{ toast.style.opacity="0"; setTimeout(()=>toast.remove(), 500); }, 2000);
+  setTimeout(() => { toast.style.opacity = "0"; setTimeout(() => toast.remove(), 500); }, 2000);
 }
 
-window.checkAdminPin = function(){
+window.checkAdminPin = function () {
   const pin = prompt("Voer de admin pincode in:");
   if (pin === "1915") { location.href = "/admin.html"; }
   else if (pin !== null) { alert("❌ Onjuiste pincode"); }
 };
-window.undoLastDrink = undoLastDrink; // voor onclick in HTML
+window.undoLastDrink = undoLastDrink;
