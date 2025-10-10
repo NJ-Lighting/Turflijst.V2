@@ -1,3 +1,4 @@
+// /js/pages/history.page.js
 import { $, euro, esc } from '../core.js';
 import { supabase } from '../supabase.client.js';
 
@@ -12,26 +13,25 @@ async function loadUsers(){
   const { data: users, error } = await supabase
     .from('users').select('id, name')
     .order('name', { ascending: true });
-  if(error) return console.error(error);
+  if(error){ console.error(error); return; }
 
-  // Echte opties: value = user.id; lege value = "alle"
   const opts = ['<option value="">— Alle gebruikers —</option>']
     .concat((users||[]).map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`))
     .join('');
-  $('#h-user').innerHTML = opts;
+  if ($('#h-user')) $('#h-user').innerHTML = opts;
 }
 
 function setDefaultDates(){
   const to = new Date();
   const from = new Date(Date.now() - 29 * 864e5);
-  $('#h-from').value = toDateInput(from);
-  $('#h-to').value = toDateInput(to);
+  if ($('#h-from')) $('#h-from').value = toDateInput(from);
+  if ($('#h-to'))   $('#h-to').value   = toDateInput(to);
 }
 
 export async function loadHistory(){
-  const userId = $('#h-user').value;
-  const from = $('#h-from').value ? new Date($('#h-from').value) : null;
-  const to   = $('#h-to').value ? new Date($('#h-to').value) : null;
+  const userId = $('#h-user')?.value || '';
+  const from = $('#h-from')?.value ? new Date($('#h-from').value) : null;
+  const to   = $('#h-to')?.value   ? new Date($('#h-to').value)   : null;
 
   let query = supabase
     .from('drinks')
@@ -42,10 +42,11 @@ export async function loadHistory(){
   if (userId) query = query.eq('user_id', userId);
 
   const { data, error } = await query;
-  if(error) return console.error(error);
+  if(error){ console.error(error); return; }
 
   const rows = [];
   let sum = 0;
+
   (data||[])
     .filter(r => {
       const t = new Date(r.created_at);
@@ -54,16 +55,23 @@ export async function loadHistory(){
       return inFrom && inTo;
     })
     .forEach(r => {
-      const dt    = new Date(r.created_at).toLocaleString('nl-NL');
-      const user  = r?.users?.name    || 'Onbekend';
+      const dt = new Date(r.created_at).toLocaleString?.('nl-NL') || new Date(r.created_at).toISOString();
+      const user  = r?.users?.name || 'Onbekend';
       const prod  = r?.products?.name || '—';
       const price = r?.products?.price || 0;
       sum += price;
-      rows.push(`<tr><td>${esc(dt)}</td><td>${esc(user)}</td><td>${esc(prod)}</td><td>${euro(price)}</td></tr>`);
+      rows.push(`
+        <tr>
+          <td>${esc(dt)}</td>
+          <td>${esc(user)}</td>
+          <td>${esc(prod)}</td>
+          <td style="text-align:right">${euro(price)}</td>
+        </tr>
+      `);
     });
 
-  $('#h-rows').innerHTML = rows.join('');
-  $('#h-sum').textContent = euro(sum);
+  if ($('#h-rows')) $('#h-rows').innerHTML = rows.join('');
+  if ($('#h-sum'))  $('#h-sum').textContent = euro(sum);
 }
 
 // local utils

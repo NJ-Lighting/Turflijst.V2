@@ -1,12 +1,13 @@
+// /js/core.js
 // type: module
 
-/** @param {string} sel */
+/** Query helper (één element) */
 export const $ = (sel) => document.querySelector(sel);
 
-/** @param {string} sel */
+/** Query helper (array van elementen) */
 export const $$ = (sel) => Array.from(document.querySelectorAll(sel));
 
-/** €-format */
+/** €-formatter (NL notatie) */
 export function euro(v) {
   const n = Number.isFinite(Number(v)) ? Number(v) : 0;
   return `€${n.toFixed(2).replace('.', ',')}`;
@@ -14,6 +15,7 @@ export function euro(v) {
 
 /** HTML escapen (veilig voor innerHTML) */
 export function esc(s) {
+  const str = String(s ?? '');
   const map = {
     '&': '&amp;',
     '<': '&lt;',
@@ -21,10 +23,10 @@ export function esc(s) {
     '"': '&quot;',
     "'": '&#39;',
   };
-  return String(s ?? '').replace(/[&<>"']/g, (ch) => map[ch]);
+  return str.replace(/[&<>"']/g, (ch) => map[ch]);
 }
 
-/** NL datum/tijd weergave (veilig bij ongeldige input) */
+/** NL datum/tijd (failsafe) */
 export function formatDate(iso) {
   try {
     return new Date(iso).toLocaleString('nl-NL');
@@ -33,11 +35,12 @@ export function formatDate(iso) {
   }
 }
 
-/** Light toast helper (geen deps) */
+/** Eenvoudige toast (geen deps) */
 export function toast(msg) {
   const el = document.createElement('div');
   el.className = 'toast';
   el.textContent = String(msg ?? '');
+
   Object.assign(el.style, {
     position: 'fixed',
     left: '50%',
@@ -50,6 +53,7 @@ export function toast(msg) {
     zIndex: 9999,
     transition: 'opacity .25s ease',
   });
+
   document.body.appendChild(el);
   setTimeout(() => {
     el.style.opacity = '0';
