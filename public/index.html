@@ -4,11 +4,11 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Turf Lijst</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="alternate icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/css/app.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script type="module" src="/js/index.page.js"></script>
+
+  <!-- Favicon + Styles -->
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="../favicon.ico">
+  <link rel="stylesheet" href="../css/app.css" />
 </head>
 <body class="bg-train">
   <div class="content-wrapper">
@@ -34,12 +34,15 @@
       <tbody id="userDrinkTotalsTable"></tbody>
     </table>
 
-   <h2>🔗 Navigatie</h2>
-<div>
-  <button class="btn" onclick="location.href='/pages/new-user.html'">👤 Gebruiker Toevoegen</button>
-  <button class="btn" onclick="location.href='/pages/history.html'">📜 Geschiedenis Bekijken</button>
-  <button class="btn" onclick="location.href='/pages/admin.html'">🔐 Admin Pagina</button>
-</div>
+    <h2>🔗 Navigatie</h2>
+    <div>
+      <button class="btn" onclick="location.href='./new-user.html'">👤 Gebruiker Toevoegen</button>
+      <button class="btn" onclick="location.href='./history.html'">📜 Geschiedenis Bekijken</button>
+      <button class="btn" onclick="location.href='./admin.html'">🔐 Admin Pagina</button>
+    </div>
+  </div>
 
+  <!-- Modules -->
+  <script type="module" src="../js/pages/index.page.js"></script>
 </body>
 </html>

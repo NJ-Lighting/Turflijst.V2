@@ -5,14 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Turf Lijst – Betalingen</title>
 
-  <!-- Favicon + Styles (één map omhoog vanaf /pages) -->
+  <!-- Favicon + Styles -->
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="../favicon.ico">
   <link rel="stylesheet" href="../css/app.css" />
-
-  <!-- Supabase + page script -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script type="module" src="../js/payment.page.js"></script>
 </head>
 <body class="bg-train">
   <div class="content-wrapper">
@@ -20,10 +16,10 @@
 
     <!-- Navigatie -->
     <div style="margin-bottom:6px">
-      <button class="btn" onclick="location.href='/'">🏠 Terug naar start</button>
-      <button class="btn" onclick="location.href='/pages/finance.html'">📊 Finance</button>
-      <button class="btn" onclick="location.href='/pages/history.html'">📜 Geschiedenis</button>
-      <button class="btn" onclick="location.href='/pages/admin.html'">🔐 Admin</button>
+      <button class="btn" onclick="location.href='./index.html'">🏠 Terug naar start</button>
+      <button class="btn" onclick="location.href='./finance.html'">📊 Finance</button>
+      <button class="btn" onclick="location.href='./history.html'">📜 Geschiedenis</button>
+      <button class="btn" onclick="location.href='./admin.html'">🔐 Admin</button>
     </div>
 
     <!-- Betaling registreren -->
@@ -61,5 +57,8 @@
       <tbody id="p-rows"></tbody>
     </table>
   </div>
+
+  <!-- Modules -->
+  <script type="module" src="../js/pages/payment.page.js"></script>
 </body>
 </html>

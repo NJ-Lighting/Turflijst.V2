@@ -9,10 +9,6 @@
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="../favicon.ico">
   <link rel="stylesheet" href="../css/app.css" />
-
-  <!-- Supabase + page script -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script type="module" src="../js/admin.page.js"></script>
 </head>
 <body class="bg-train">
   <div class="content-wrapper">
@@ -20,9 +16,9 @@
 
     <!-- Navigatie -->
     <div style="margin-bottom:6px">
-      <button class="btn" onclick="location.href='/'">🏠 Terug naar start</button>
-      <button class="btn" onclick="location.href='/pages/finance.html'">📊 Finance</button>
-      <button class="btn" onclick="location.href='/pages/stock.html'">📦 Voorraad</button>
+      <button class="btn" onclick="location.href='./index.html'">🏠 Terug naar start</button>
+      <button class="btn" onclick="location.href='./finance.html'">📊 Finance</button>
+      <button class="btn" onclick="location.href='./stock.html'">📦 Voorraad</button>
     </div>
 
     <!-- Gebruikersbeheer -->
@@ -44,5 +40,8 @@
       <tbody id="tbl-products"></tbody>
     </table>
   </div>
+
+  <!-- Modules -->
+  <script type="module" src="../js/pages/admin.page.js"></script>
 </body>
 </html>
