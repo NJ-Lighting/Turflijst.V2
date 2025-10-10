@@ -4,13 +4,12 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>🍺 Turflijst</title>
-  <!-- Laad CSS vanaf je eigen deploy (Vercel) i.p.v. raw GH, anders wordt het geblokkeerd -->
   <link rel="stylesheet" href="/css/app.css" />
 </head>
-<body>
+<body class="bg-train">
   <div class="content-wrapper">
     <div class="admin-link">
-      <button class="button" onclick="(function(){
+      <button class="btn" onclick="(function(){
         const pin = prompt('Voer admin PIN in:');
         if (pin === '1915') location.href = '/admin.html';
         else alert('❌ Onjuiste PIN');
@@ -27,7 +26,7 @@
 
     <div class="flex">
       <h2>Beschikbare Drankjes</h2>
-      <button class="button" onclick="undoLastDrink()">⏪ Undo laatste drankje</button>
+      <button class="btn" onclick="undoLastDrink()">⏪ Undo laatste drankje</button>
     </div>
 
     <div id="product-buttons" class="grid"></div>
