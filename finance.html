@@ -6,7 +6,7 @@
   <title>💰 Finance | Turflijst</title>
   <link rel="stylesheet" href="/css/app.css" />
 </head>
-<body>
+<body class="bg-train">
   <div class="content-wrapper">
     <h1>💰 Finance Overzicht</h1>
 
@@ -30,9 +30,9 @@
     <section class="card section">
       <h2>🏦 Statiegeld registreren</h2>
       <div class="row">
-        <input id="deposit-amount" type="number" inputmode="decimal" step="0.01" placeholder="Bedrag in €" />
-        <input id="deposit-note" type="text" placeholder="Opmerking (optioneel)" />
-        <button id="btn-add-deposit">Opslaan</button>
+        <input id="deposit-amount" class="input" type="number" inputmode="decimal" step="0.01" placeholder="Bedrag in €" />
+        <input id="deposit-note" class="input" type="text" placeholder="Opmerking (optioneel)" />
+        <button id="btn-add-deposit" class="btn">Opslaan</button>
       </div>
     </section>
 
@@ -50,7 +50,7 @@
       <h2>💸 Betalingen</h2>
       <div class="row">
         <label for="filter-user" class="muted">Filter gebruiker</label>
-        <select id="filter-user"></select>
+        <select id="filter-user" class="select"></select>
       </div>
       <table class="table">
         <thead>
@@ -66,10 +66,10 @@
       </table>
 
       <div class="row">
-        <select id="pay-user" title="Gebruiker"></select>
-        <input id="pay-amount" type="number" inputmode="decimal" step="0.01" placeholder="Bedrag in €" />
-        <input id="p-note" type="text" placeholder="Opmerking (optioneel)" />
-        <button id="btn-add-payment">Betaling toevoegen</button>
+        <select id="pay-user" class="select" title="Gebruiker"></select>
+        <input id="pay-amount" class="input" type="number" inputmode="decimal" step="0.01" placeholder="Bedrag in €" />
+        <input id="p-note" class="input" type="text" placeholder="Opmerking (optioneel)" />
+        <button id="btn-add-payment" class="btn">Betaling toevoegen</button>
       </div>
     </section>
 
@@ -85,7 +85,6 @@
     </section>
   </div>
 
-  <!-- Modules -->
   <script type="module" src="/js/core.js"></script>
   <script type="module" src="/js/supabase.client.js"></script>
   <script type="module" src="/js/api/finance.js"></script>

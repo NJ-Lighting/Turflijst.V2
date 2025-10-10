@@ -4,13 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Admin Dashboard</title>
-  <!-- Gebruik jullie bestaande stylesheet in de repo -->
   <link rel="stylesheet" href="/css/app.css" />
 </head>
-<body>
+<body class="bg-train">
   <div class="content-wrapper">
     <div class="flex">
-      <button class="button" onclick="location.href='/index.html'">← Terug naar Index</button>
+      <button class="btn" onclick="location.href='/index.html'">← Terug naar Index</button>
       <h1>Admin Dashboard</h1>
       <div></div>
     </div>
@@ -18,7 +17,7 @@
     <!-- Gebruikersbeheer -->
     <section>
       <h2>Gebruikersbeheer</h2>
-      <table>
+      <table class="table">
         <thead>
           <tr>
             <th>Naam</th>
@@ -29,9 +28,7 @@
             <th>Acties</th>
           </tr>
         </thead>
-        <tbody id="tbl-users">
-          <!-- Gevuld door /js/pages/admin.page.js -->
-        </tbody>
+        <tbody id="tbl-users"></tbody>
       </table>
     </section>
 
@@ -42,10 +39,10 @@
         <input id="new-product-name" class="input" placeholder="Productnaam" />
         <input id="new-product-price" class="input" placeholder="Prijs (€)" type="number" step="0.01" inputmode="decimal" />
         <input id="new-product-image" class="file-input" type="file" accept="image/*" />
-        <button id="btn-add-product" class="button">Product toevoegen</button>
+        <button id="btn-add-product" class="btn">Product toevoegen</button>
       </div>
 
-      <table>
+      <table class="table">
         <thead>
           <tr>
             <th>Afbeelding</th>
@@ -54,14 +51,11 @@
             <th>Acties</th>
           </tr>
         </thead>
-        <tbody id="tbl-products">
-          <!-- Gevuld door /js/pages/admin.page.js -->
-        </tbody>
+        <tbody id="tbl-products"></tbody>
       </table>
     </section>
   </div>
 
-  <!-- Modules (geen inline JS meer) -->
   <script type="module" src="/js/core.js"></script>
   <script type="module" src="/js/supabase.client.js"></script>
   <script type="module" src="/js/api/metrics.js"></script>

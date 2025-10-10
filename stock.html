@@ -4,10 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>📦 Voorraadbeheer</title>
-  <!-- Gebruik jullie centrale stylesheet uit de repo -->
   <link rel="stylesheet" href="/css/app.css" />
 </head>
-<body>
+<body class="bg-train">
   <div class="content-wrapper">
     <h1>📦 Voorraadbeheer</h1>
 
@@ -17,7 +16,7 @@
 
       <div class="row">
         <label for="batch-product">Product</label>
-        <select id="batch-product"><!-- gevuld door loadProducts() --></select>
+        <select id="batch-product" class="select"><!-- gevuld door loadProducts() --></select>
       </div>
 
       <div class="row">
@@ -43,7 +42,7 @@
       <div id="calc-hint" class="muted"></div>
 
       <div class="row" style="margin-top:8px">
-        <button id="btn-add-batch" class="button">Batch toevoegen</button>
+        <button id="btn-add-batch" class="btn">Batch toevoegen</button>
       </div>
     </section>
 
@@ -61,7 +60,7 @@
             <th>Actie</th>
           </tr>
         </thead>
-        <tbody id="tbl-batches"><!-- gevuld door loadActiveBatches() --></tbody>
+        <tbody id="tbl-batches"></tbody>
       </table>
     </section>
 
@@ -75,12 +74,11 @@
             <th class="right">Voorraad</th>
           </tr>
         </thead>
-        <tbody id="tbl-stock-per-product"><!-- gevuld door loadStockPerProduct() --></tbody>
+        <tbody id="tbl-stock-per-product"></tbody>
       </table>
     </section>
   </div>
 
-  <!-- Modules -->
   <script type="module" src="/js/core.js"></script>
   <script type="module" src="/js/supabase.client.js"></script>
   <script type="module" src="/js/api/stock.js"></script>
