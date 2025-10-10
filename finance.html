@@ -1,60 +1,121 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="nl">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Turf Lijst – Finance</title>
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="alternate icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/css/app.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>💰 Finance | Turflijst</title>
+  <style>
+    :root { --bg: #0b0f14; --panel: rgba(255,255,255,.08); --text: #e9eef5; --muted:#a8b3c7; --accent:#54d6ff; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;background:var(--bg) url("/Train%20scene.webp") center/cover fixed no-repeat;color:var(--text)}
+    header{padding:24px 16px 8px;text-align:center}
+    h1{margin:0 0 8px;font-size:28px}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px}
+    .grid{display:grid;gap:16px}
+    .cards{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+    .card{background:var(--panel);backdrop-filter: blur(6px); border:1px solid rgba(255,255,255,.08); padding:16px;border-radius:14px}
+    .kpi{display:flex;flex-direction:column;gap:6px}
+    .kpi .lbl{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+    .kpi .val{font-size:22px}
+    table{width:100%;border-collapse:collapse}
+    thead th{font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:10px}
+    tbody td{padding:10px;border-top:1px solid rgba(255,255,255,.08)}
+    td.right{text-align:right}
+    .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+    select,input,button{background:rgba(255,255,255,.06); color:var(--text); border:1px solid rgba(255,255,255,.12); padding:8px 10px;border-radius:10px}
+    input::placeholder{color:#93a1b5}
+    button{cursor:pointer}
+    .muted{color:var(--muted)}
+    .section{margin-top:18px}
+  </style>
 </head>
-<body class="bg-train">
-  <div class="content-wrapper">
-    <h1>📊 Finance</h1>
+<body>
+  <header>
+    <h1>💰 Finance</h1>
+    <div class="muted">Overzicht van verkopen, betalingen & statiegeld</div>
+  </header>
 
-    <div style="margin-bottom:6px">
-      <button class="btn" onclick="location.href='./index.html'">🏠 Terug naar start</button>
-      <button class="btn" onclick="location.href='./history.html'">📜 Geschiedenis</button>
-      <button class="btn" onclick="location.href='./admin.html'">🔐 Admin</button>
-    </div>
+  <main class="wrap grid">
+    <!-- KPI’s -->
+    <section class="grid cards">
+      <div class="card kpi"><div class="lbl">Koelkastwaarde</div><div id="kpi-fridge" class="val">€0,00</div></div>
+      <div class="card kpi"><div class="lbl">Voorgeschoten</div><div id="kpi-prepaid" class="val">€0,00</div></div>
+      <div class="card kpi"><div class="lbl">Ontvangen</div><div id="kpi-received" class="val">€0,00</div></div>
+      <div class="card kpi"><div class="lbl">Statiegeld ontvangen</div><div id="kpi-deposit-earned" class="val">€0,00</div></div>
+      <div class="card kpi"><div class="lbl">Profit/Loss</div><div id="kpi-profit" class="val">€0,00</div></div>
+    </section>
 
-    <h2>Overzicht</h2>
-    <table class="table">
-      <tbody>
-        <tr><th style="width:50%">Totale voorgeschoten bedrag</th><td id="kpi-advanced">€0,00</td></tr>
-        <tr><th>Totale waarde in koelkast (voorraad)</th><td id="kpi-fridge">€0,00</td></tr>
-        <tr><th>Statiegeld in omloop</th><td id="kpi-deposit-circulation">€0,00</td></tr>
-      </tbody>
-    </table>
+    <!-- Buffer -->
+    <section class="grid cards">
+      <div class="card kpi"><div class="lbl">Buffer in</div><div id="kpi-buffer-in" class="val">€0,00</div></div>
+      <div class="card kpi"><div class="lbl">Buffer uit</div><div id="kpi-buffer-out" class="val">€0,00</div></div>
+      <div class="card kpi"><div class="lbl">Buffer beschikbaar</div><div id="kpi-buffer-available" class="val">€0,00</div></div>
+    </section>
 
-    <h2>Verkochte blikjes per product</h2>
-    <table class="table">
-      <thead><tr><th>Product</th><th>Aantal</th></tr></thead>
-      <tbody id="tbl-sold-per-product"></tbody>
-    </table>
+    <!-- Deposits -->
+    <section class="card section">
+      <h2>🏦 Statiegeld registreren</h2>
+      <div class="row">
+        <input id="deposit-amount" type="number" inputmode="decimal" step="0.01" placeholder="Bedrag in €" />
+        <input id="deposit-note" type="text" placeholder="Opmerking (optioneel)" />
+        <button id="btn-add-deposit">Opslaan</button>
+      </div>
+      <div class="muted" style="margin-top:6px">Wordt meegeteld in buffer & KPI’s</div>
+    </section>
 
-    <h2>Betaling registreren</h2>
-    <div>
-      <label for="pay-user">Gebruiker</label><br />
-      <select id="pay-user" class="select"></select>
-      <br />
-      <label for="pay-amount">Bedrag (€)</label><br />
-      <input id="pay-amount" class="select" type="number" step="0.01" min="0" placeholder="0,00" />
-      <br />
-      <button class="btn" id="btn-add-payment">➕ Registreren</button>
-    </div>
+    <!-- Verkocht per product -->
+    <section class="card section">
+      <h2>📦 Verkocht per product</h2>
+      <table>
+        <thead><tr><th>Product</th><th class="right">Aantal</th></tr></thead>
+        <tbody id="tbl-sold-per-product"></tbody>
+      </table>
+    </section>
 
-    <h2>Betalingen</h2>
-    <div>
-      <label for="filter-user">Filter op gebruiker</label><br />
-      <select id="filter-user" class="select"></select>
-    </div>
-    <table class="table">
-      <thead><tr><th>Datum</th><th>Gebruiker</th><th>Bedrag (€)</th></tr></thead>
-      <tbody id="tbl-payments"></tbody>
-    </table>
-  </div>
+    <!-- Betalingen -->
+    <section class="card section">
+      <h2>💸 Betalingen</h2>
+      <div class="row" style="margin-bottom:8px">
+        <label for="filter-user" class="muted">Filter gebruiker</label>
+        <select id="filter-user"></select>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Datum</th>
+            <th>Gebruiker</th>
+            <th class="right">Bedrag</th>
+            <th>Opmerking</th>
+            <th>Actie</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-payments"></tbody>
+      </table>
 
+      <div class="row" style="margin-top:12px">
+        <select id="pay-user" title="Gebruiker"></select>
+        <input id="pay-amount" type="number" inputmode="decimal" step="0.01" placeholder="Bedrag in €" />
+        <input id="p-note" type="text" placeholder="Opmerking (optioneel)" />
+        <button id="btn-add-payment">Betaling toevoegen</button>
+      </div>
+    </section>
+
+    <!-- (optioneel) Maand-statistiek -->
+    <section class="card section">
+      <h2>📅 Maandoverzicht (optioneel)</h2>
+      <table>
+        <thead>
+          <tr><th>Maand</th><th class="right">Verkopen</th><th class="right">Betalingen</th><th class="right">Deposits</th></tr>
+        </thead>
+        <tbody id="month-stats"><tr><td colspan="4" class="muted">Wordt gevuld als data aanwezig is</td></tr></tbody>
+      </table>
+    </section>
+  </main>
+
+  <!-- Modules -->
+  <script type="module" src="/js/core.js"></script>
+  <script type="module" src="/js/supabase.client.js"></script>
+  <script type="module" src="/js/api/finance.js"></script>
   <script type="module" src="/js/pages/finance.page.js"></script>
 </body>
 </html>
