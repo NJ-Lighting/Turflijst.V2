@@ -4,74 +4,41 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>🍺 Turflijst</title>
-  <style>
-    :root { --bg:#0b0f14; --panel:rgba(255,255,255,.08); --text:#e9eef5; --muted:#a8b3c7; --accent:#54d6ff; }
-    *{box-sizing:border-box}
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif;background:var(--bg) url("/Train%20scene.webp") center/cover fixed no-repeat;color:var(--text)}
-    header{padding:24px 16px 8px;text-align:center}
-    h1{margin:0 0 8px;font-size:28px}
-    .wrap{max-width:1100px;margin:0 auto;padding:16px}
-    .grid{display:grid;gap:16px}
-    .cards{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
-    .card{background:var(--panel);backdrop-filter: blur(6px); border:1px solid rgba(255,255,255,.08); padding:16px;border-radius:14px}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    label{color:var(--muted);font-size:12px}
-    select,button{background:rgba(255,255,255,.06); color:var(--text); border:1px solid rgba(255,255,255,.12); padding:10px 12px;border-radius:10px}
-    button{cursor:pointer}
-    .muted{color:var(--muted)}
-    .product-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
-    .btn{padding:12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06)}
-    table{width:100%;border-collapse:collapse}
-    thead th{font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;text-align:left;padding:10px}
-    tbody td{padding:10px;border-top:1px solid rgba(255,255,255,.08)}
-    td.right{text-align:right}
-  </style>
+  <link rel="stylesheet" href="/css/style.css" />
 </head>
 <body>
-  <header>
+  <div class="content-wrapper">
+    <div class="admin-link">
+      <button class="button" onclick="(function(){const pin=prompt('Voer admin PIN in:'); if(pin==='1915') location.href='/admin.html'; else alert('❌ Onjuiste PIN');})()">Naar Admin</button>
+    </div>
+
     <h1>🍺 Turflijst</h1>
-    <div class="muted">Kies een gebruiker en turf een drankje</div>
-  </header>
+    <p>Kies een gebruiker en klik op een drankje om te turven</p>
 
-  <main class="wrap grid">
-    <!-- Gebruiker keuze + acties -->
-    <section class="card">
-      <div class="row">
-        <div>
-          <label for="user">Gebruiker</label><br />
-          <select id="user"></select>
-        </div>
-        <div class="row" style="margin-left:auto">
-          <button id="btn-undo" class="btn" onclick="undoLastDrink()">⏪ Undo laatste drankje</button>
-          <button id="btn-admin" class="btn" onclick="(function(){const pin=prompt('Voer admin PIN in:'); if(pin==='1915') location.href='/admin.html'; else alert('❌ Onjuiste PIN');})()">Admin</button>
-        </div>
-      </div>
-    </section>
+    <div class="dropdown">
+      <label for="user">Gebruiker:</label>
+      <select id="user"></select>
+    </div>
 
-    <!-- Producten -->
-    <section class="card">
-      <h2 style="margin:0 0 8px">Beschikbare drankjes</h2>
-      <div id="product-buttons" class="product-grid"></div>
-      <div id="no-stock" class="muted" style="display:none">Geen voorraad beschikbaar</div>
-    </section>
+    <div class="flex">
+      <h2>Beschikbare Drankjes</h2>
+      <button class="button" onclick="undoLastDrink()">⏪ Undo laatste drankje</button>
+    </div>
 
-    <!-- Overzichten -->
-    <section class="card">
-      <h2 style="margin:0 0 8px">Totaal te betalen</h2>
-      <table>
-        <thead><tr><th>Gebruiker</th><th class="right">Bedrag</th></tr></thead>
-        <tbody id="totalToPayList"></tbody>
-      </table>
-    </section>
+    <div id="product-buttons" class="grid"></div>
 
-    <section class="card">
-      <h2 style="margin:0 0 8px">Drankjes per gebruiker</h2>
-      <table>
-        <thead><tr><th>Gebruiker</th><th class="right">Aantal</th></tr></thead>
-        <tbody id="userDrinkTotalsTable"></tbody>
-      </table>
-    </section>
-  </main>
+    <h3 class="section-title">Totaal te betalen</h3>
+    <table class="table">
+      <thead><tr><th>Gebruiker</th><th class="right">Bedrag</th></tr></thead>
+      <tbody id="totalToPayList"></tbody>
+    </table>
+
+    <h3 class="section-title">Drankjes per gebruiker</h3>
+    <table class="table">
+      <thead><tr><th>Gebruiker</th><th class="right">Aantal</th></tr></thead>
+      <tbody id="userDrinkTotalsTable"></tbody>
+    </table>
+  </div>
 
   <!-- Modules -->
   <script type="module" src="/js/core.js"></script>
