@@ -13,7 +13,7 @@ body{
 
 /* Background */
 .bg-train{
-  background:url('./Train%20scene.webp') no-repeat center center fixed;
+  background:url('/Train%20scene.webp') no-repeat center center fixed;
   background-size:cover;
 }
 
