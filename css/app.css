@@ -22,7 +22,7 @@ body{
 
 /* Background */
 .bg-train{
-  background:url('./Train%20scene.webp') no-repeat center center fixed;
+  background:url('https://raw.githubusercontent.com/NJ-Lighting/Turflijst/main/Train%20scene.webp') no-repeat center center fixed;
   background-size:cover;
 }
 
