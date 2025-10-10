@@ -1,6 +1,7 @@
 // /js/pages/admin.page.js
 import { $, $$, toast, euro, esc } from '../core.js';
 import { supabase } from '../supabase.client.js';
+import { fetchUserMetrics } from '../api/metrics.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadUsers();
@@ -9,27 +10,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loadUsers() {
-  const { data: users, error } = await supabase
-    .from('users')
-    .select('id, name, balance, total_drinks')
-    .order('name', { ascending: true });
-  if (error) return console.error(error);
-  const rows = (users || [])
-    .map(
-      (u) => `
-      <tr>
-        <td>${esc(u.name)}</td>
-        <td>${euro(u.balance || 0)}</td>
-        <td>${u.total_drinks || 0}</td>
-        <td>
-          <button class="btn" onclick="resetUser(${u.id})">🔄 Nulzetten</button>
-          <button class="btn" onclick="deleteUser(${u.id})">🗑️ Verwijderen</button>
-          <button class="btn" onclick="markPaid(${u.id})">💰 Betaald</button>
-        </td>
-      </tr>`
-    )
-    .join('');
-  $('#tbl-users').innerHTML = rows;
+  try{
+    const metrics = await fetchUserMetrics(supabase);
+    const rows = (metrics || [])
+      .map(u => `
+        <tr>
+          <td>${esc(u.name)}</td>
+          <td>${euro(u.balance)}</td>
+          <td>${u.count}</td>
+          <td>
+            <button class="btn" onclick="resetUser('${esc(u.id)}')">Nulzetten</button>
+            <button class="btn btn-warn" onclick="deleteUser('${esc(u.id)}')">️ Verwijderen</button>
+            <button class="btn" onclick="markPaid('${esc(u.id)}')">Betaald</button>
+          </td>
+        </tr>
+      `).join('');
+    $('#tbl-users').innerHTML = rows;
+  } catch(err){
+    console.error('loadUsers metrics error:', err);
+    toast('❌ Kan gebruikers niet laden');
+  }
 }
 
 async function loadProducts() {
@@ -41,14 +41,15 @@ async function loadProducts() {
   const rows = (products || [])
     .map(
       (p) => `
-      <tr>
-        <td>${esc(p.name)}</td>
-        <td>${euro(p.price)}</td>
-        <td>
-          <button class="btn" onclick="editProduct(${p.id})">✏️ Bewerken</button>
-          <button class="btn" onclick="deleteProduct(${p.id})">🗑️ Verwijderen</button>
-        </td>
-      </tr>`
+        <tr>
+          <td>${esc(p.name)}</td>
+          <td>${euro(p.price)}</td>
+          <td>
+            <button class="btn" onclick="editProduct(${Number(p.id)})">✏️ Bewerken</button>
+            <button class="btn btn-warn" onclick="deleteProduct(${Number(p.id)})">️ Verwijderen</button>
+          </td>
+        </tr>
+      `
     )
     .join('');
   $('#tbl-products').innerHTML = rows;
@@ -87,12 +88,12 @@ async function deleteProduct(id) {
 }
 
 async function resetUser(id) {
-  if (!confirm('Gebruiker resetten (saldo en drankjes naar 0)?')) return;
-  const { error } = await supabase
-    .from('users')
-    .update({ balance: 0, total_drinks: 0 })
-    .eq('id', id);
-  if (error) return console.error(error);
+  if (!confirm('Gebruiker resetten? (drankjes & betalingen wissen)')) return;
+  const [{ error: e1 }, { error: e2 }] = await Promise.all([
+    supabase.from('drinks').delete().eq('user_id', id),
+    supabase.from('payments').delete().eq('user_id', id),
+  ]);
+  if (e1 || e2) { console.error(e1||e2); return toast('❌ Reset mislukt'); }
   toast('✅ Gebruiker gereset');
   await loadUsers();
 }
@@ -106,12 +107,17 @@ async function deleteUser(id) {
 }
 
 async function markPaid(id) {
-  const { data: u } = await supabase.from('users').select('balance').eq('id', id).single();
+  // actuele balans via centrale metrics
+  let metrics = [];
+  try {
+    metrics = await fetchUserMetrics(supabase);
+  } catch(err){ console.error(err); return toast('❌ Kan saldo niet bepalen'); }
+  const u = metrics.find(m => m.id === id);
   const amount = u?.balance || 0;
-  if (amount <= 0) return toast('Geen openstaand saldo');
+  if (!(amount > 0)) return toast('Geen openstaand saldo');
   const extRef = `adminpay-${id}-${Date.now()}`;
-  await supabase.from('payments').insert([{ user_id: id, amount, ext_ref: extRef }]);
-  await supabase.from('users').update({ balance: 0 }).eq('id', id);
+  const { error } = await supabase.from('payments').insert([{ user_id: id, amount, ext_ref: extRef }]);
+  if (error) { console.error(error); return toast('❌ Betaling registreren mislukt'); }
   toast('✅ Betaling geregistreerd');
   await loadUsers();
 }

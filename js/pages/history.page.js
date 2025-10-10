@@ -9,9 +9,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 async function loadUsers(){
-  const { data: users, error } = await supabase.from('users').select('id, name').order('name', { ascending: true });
+  const { data: users, error } = await supabase
+    .from('users').select('id, name')
+    .order('name', { ascending: true });
   if(error) return console.error(error);
-  const opts = ['— Alle gebruikers —'].concat((users||[]).map(u => `<option value="${u.id}">${esc(u.name)}</option>`)).join('');
+
+  // Echte opties: value = user.id; lege value = "alle"
+  const opts = ['<option value="">— Alle gebruikers —</option>']
+    .concat((users||[]).map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`))
+    .join('');
   $('#h-user').innerHTML = opts;
 }
 
@@ -25,10 +31,15 @@ function setDefaultDates(){
 export async function loadHistory(){
   const userId = $('#h-user').value;
   const from = $('#h-from').value ? new Date($('#h-from').value) : null;
-  const to   = $('#h-to').value ? new Date($('#h-to').value)   : null;
+  const to   = $('#h-to').value ? new Date($('#h-to').value) : null;
 
-  let query = supabase.from('drinks').select('created_at, users(name), products(name, price)').order('created_at', { ascending: false }).limit(500);
-  if(userId) query = query.eq('user_id', userId);
+  let query = supabase
+    .from('drinks')
+    .select('created_at, users(name), products(name, price)')
+    .order('created_at', { ascending: false })
+    .limit(500);
+
+  if (userId) query = query.eq('user_id', userId);
 
   const { data, error } = await query;
   if(error) return console.error(error);
@@ -43,19 +54,19 @@ export async function loadHistory(){
       return inFrom && inTo;
     })
     .forEach(r => {
-      const dt = new Date(r.created_at).toLocaleString('nl-NL');
-      const user = r?.users?.name || 'Onbekend';
-      const prod = r?.products?.name || '—';
+      const dt    = new Date(r.created_at).toLocaleString('nl-NL');
+      const user  = r?.users?.name    || 'Onbekend';
+      const prod  = r?.products?.name || '—';
       const price = r?.products?.price || 0;
       sum += price;
-      rows.push(`<tr><td>${dt}</td><td>${esc(user)}</td><td>${esc(prod)}</td><td>${euro(price)}</td></tr>`);
+      rows.push(`<tr><td>${esc(dt)}</td><td>${esc(user)}</td><td>${esc(prod)}</td><td>${euro(price)}</td></tr>`);
     });
 
   $('#h-rows').innerHTML = rows.join('');
   $('#h-sum').textContent = euro(sum);
 }
 
-// local utils (of vanuit core.js halen als je wilt)
+// local utils
 function truncDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
 function endOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
 function toDateInput(d){ return d.toISOString().slice(0,10); }

@@ -2,9 +2,11 @@
 // Centrale metriek-functies voor alle pagina's
 
 /**
- * Haal per gebruiker de totaalprijs (total) en het aantal drankjes (count) op.
- * @param {import('@supabase/supabase-js').SupabaseClient} supabase
- * @returns {Promise<Array<{id:string,name:string,total:number,count:number}>>}
+ * Haal per gebruiker:
+ *  - total: som van prijzen van gelogde drankjes
+ *  - count: aantal gelogde drankjes
+ *  - paid:  som van betalingen
+ *  - balance: total - paid
  */
 export async function fetchUserMetrics(supabase){
   // 1) Users
@@ -14,7 +16,7 @@ export async function fetchUserMetrics(supabase){
     .order('name', { ascending: true });
   if (uErr) throw uErr;
 
-  // 2) Drinks + price (join) met fallback
+  // 2) Drinks + price (join), met fallback
   let drinkRows = [];
   let joinError = null;
   try {
@@ -51,11 +53,22 @@ export async function fetchUserMetrics(supabase){
     counts.set(u, (counts.get(u) || 0) + 1);
   }
 
-  // 4) Combineer met users
-  return (users || []).map(u => ({
-    id: u.id,
-    name: u.name,
-    total: totals.get(u.id) || 0,
-    count: counts.get(u.id) || 0,
-  }));
+  // 4) Betalingen per user
+  const { data: pays, error: pErr } = await supabase
+    .from('payments')
+    .select('user_id, amount');
+  if (pErr) throw pErr;
+  const paid = new Map();
+  (pays || []).forEach(p => {
+    paid.set(p.user_id, (paid.get(p.user_id) || 0) + (Number(p.amount) || 0));
+  });
+
+  // 5) Combineer alles
+  return (users || []).map(u => {
+    const total = totals.get(u.id) || 0;
+    const count = counts.get(u.id) || 0;
+    const paidAmt = paid.get(u.id) || 0;
+    const balance = total - paidAmt;
+    return { id: u.id, name: u.name, total, count, paid: paidAmt, balance };
+  });
 }

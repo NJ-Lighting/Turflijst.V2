@@ -5,7 +5,8 @@ import {
   loadKPIs,
   loadSoldPerProduct,
   loadPayments,
-  addPayment
+  addPayment,
+  deletePayment,
 } from '../api/finance.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -13,6 +14,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadKPIs();
   await loadSoldPerProduct();
   await loadPayments();
-  $('#btn-add-payment')?.addEventListener('click', addPayment);
+
+  // Add payment met refresh na afloop
+  $('#btn-add-payment')?.addEventListener('click', () =>
+    addPayment('#pay-user', '#pay-amount', '#p-note', loadPayments)
+  );
+
+  // Filter op gebruiker
   $('#filter-user')?.addEventListener('change', () => loadPayments());
+
+  // inline onclick delete in tabel
+  window.deletePayment = (id) => deletePayment(id, loadPayments);
 });
