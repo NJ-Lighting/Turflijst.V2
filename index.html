@@ -4,8 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>🍺 Turflijst</title>
-  <!-- Stylesheet direct uit GitHub repo laden -->
-  <link rel="stylesheet" href="https://raw.githubusercontent.com/NJ-Lighting/Turflijst.V2/refs/heads/main/css/app.css" />
+  <!-- Laad CSS vanaf je eigen deploy (Vercel) i.p.v. raw GH, anders wordt het geblokkeerd -->
+  <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body>
   <div class="content-wrapper">
@@ -34,17 +34,13 @@
 
     <h3 class="section-title">Totaal te betalen</h3>
     <table class="table">
-      <thead>
-        <tr><th>Gebruiker</th><th class="right">Bedrag</th></tr>
-      </thead>
+      <thead><tr><th>Gebruiker</th><th class="right">Bedrag</th></tr></thead>
       <tbody id="totalToPayList"></tbody>
     </table>
 
     <h3 class="section-title">Drankjes per gebruiker</h3>
     <table class="table">
-      <thead>
-        <tr><th>Gebruiker</th><th class="right">Aantal</th></tr>
-      </thead>
+      <thead><tr><th>Gebruiker</th><th class="right">Aantal</th></tr></thead>
       <tbody id="userDrinkTotalsTable"></tbody>
     </table>
   </div>
