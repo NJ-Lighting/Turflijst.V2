@@ -1,6 +1,7 @@
 // /js/pages/index.page.js
 import { $, $$, toast, euro, esc } from '../core.js';
 import { supabase } from '../supabase.client.js';
+import { fetchUserMetrics } from '../api/metrics.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadUsers();
@@ -26,7 +27,6 @@ async function loadUsers() {
     .map((u) => `<option value="${esc(u.id)}">${esc(u.name)}</option>`)
     .join('');
 
-  // Option: direct totals na laden
   await refreshTotals();
 }
 
@@ -68,7 +68,6 @@ window.logDrink = async (productId) => {
 
   const price = product?.price || 0;
 
-  // Log drankje
   const { error: insErr } = await supabase
     .from('drinks')
     .insert([{ user_id: userId, product_id: productId }]);
@@ -78,13 +77,11 @@ window.logDrink = async (productId) => {
     return toast('❌ Fout bij loggen van drankje');
   }
 
-  // Update saldo via RPC
   const { error: rpcErr } = await supabase
     .rpc('update_user_balance', { user_id: userId, amount: price });
 
   if (rpcErr) {
     console.error('update_user_balance error:', rpcErr);
-    // (We laten het drankje staan; alleen saldo update faalde)
   }
 
   toast('✅ Drankje toegevoegd');
@@ -97,7 +94,6 @@ window.undoLastDrink = async () => {
 
   if (!userId) return toast('⚠️ Kies eerst een gebruiker');
 
-  // Pak laatste drankje
   const { data, error } = await supabase
     .from('drinks')
     .select('id, product_id')
@@ -108,7 +104,6 @@ window.undoLastDrink = async () => {
 
   if (error || !data) return toast('❌ Geen drankje om te verwijderen');
 
-  // Verwijder drankje
   const { error: delErr } = await supabase
     .from('drinks')
     .delete()
@@ -119,7 +114,6 @@ window.undoLastDrink = async () => {
     return toast('❌ Verwijderen mislukt');
   }
 
-  // Corrigeer saldo
   const { data: prod } = await supabase
     .from('products')
     .select('price')
@@ -137,25 +131,22 @@ window.undoLastDrink = async () => {
   await refreshTotals();
 };
 
-/* ---------- Totals render ---------- */
+/* ---------- Totals render (centraal via metrics) ---------- */
 async function refreshTotals() {
-  const { data: users, error } = await supabase
-    .from('users')
-    .select('id, name, balance, total_drinks')
-    .order('name', { ascending: true });
+  try {
+    const metrics = await fetchUserMetrics(supabase);
 
-  if (error) {
-    console.error('refreshTotals error:', error);
-    return;
+    const totalsTbody = $('#totalToPayList');
+    totalsTbody.innerHTML = metrics
+      .map(u => `<tr><td>${esc(u.name)}</td><td>${euro(u.total)}</td></tr>`)
+      .join('');
+
+    const drinksTbody = $('#userDrinkTotalsTable');
+    drinksTbody.innerHTML = metrics
+      .map(u => `<tr><td>${esc(u.name)}</td><td>${u.count}</td></tr>`)
+      .join('');
+  } catch(err){
+    console.error('refreshTotals metrics error:', err);
+    toast('❌ Kan totalen niet laden');
   }
-
-  const totalsTbody = $('#totalToPayList');
-  totalsTbody.innerHTML = (users || [])
-    .map((u) => `<tr><td>${esc(u.name)}</td><td>${euro(u.balance || 0)}</td></tr>`)
-    .join('');
-
-  const drinksTbody = $('#userDrinkTotalsTable');
-  drinksTbody.innerHTML = (users || [])
-    .map((u) => `<tr><td>${esc(u.name)}</td><td>${u.total_drinks || 0}</td></tr>`)
-    .join('');
 }
