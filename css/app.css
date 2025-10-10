@@ -1,51 +1,32 @@
 :root{
-  --green:#4CAF50;
-  --green-d:#2f7f3d;
-  --btn:#1e5627;
-  --danger:#d9534f;
-  --danger-d:#c9302c;
-  --panel: rgba(0,0,0,.80);
-  --panel-2: rgba(0,0,0,.85);
-  --text:#fff;
-  --muted:#d5d5d5;
-  --border:#000;
+  --green:#4CAF50; --green-d:#2f7f3d; --btn:#1e5627;
+  --danger:#d9534f; --danger-d:#c9302c;
+  --panel: rgba(0,0,0,.80); --panel-2: rgba(0,0,0,.85);
+  --text:#fff; --muted:#d5d5d5; --border:#000;
 }
 *{ box-sizing:border-box }
 html,body{ height:100% }
 body{
-  margin:0;
-  font-family:Arial,sans-serif;
-  color:var(--text);
-  text-align:center;
-  padding:20px
+  margin:0; font-family:Arial,sans-serif; color:var(--text);
+  text-align:center; padding:20px;
 }
 
 /* Background */
 .bg-train{
-  background:url('https://raw.githubusercontent.com/NJ-Lighting/Turflijst/main/Train%20scene.webp') no-repeat center center fixed;
+  background:url('./Train%20scene.webp') no-repeat center center fixed;
   background-size:cover;
 }
 
 /* Wrapper */
 .content-wrapper{
-  background:var(--panel);
-  padding:20px;
-  border-radius:10px;
-  display:inline-block;
-  width:min(95%, 1000px);
+  background:var(--panel); padding:20px; border-radius:10px;
+  display:inline-block; width:min(95%, 1000px);
 }
 
 /* Buttons */
 .btn{
-  display:inline-block;
-  padding:15px 20px;
-  font-size:18px;
-  margin:10px;
-  cursor:pointer;
-  border:none;
-  border-radius:10px;
-  background:var(--btn);
-  color:#fff;
+  display:inline-block; padding:15px 20px; font-size:18px; margin:10px;
+  cursor:pointer; border:none; border-radius:10px; background:var(--btn); color:#fff;
   transition:transform .2s, background .2s;
 }
 .btn:hover{ background:var(--green-d); transform:scale(1.07) }
@@ -55,88 +36,40 @@ body{
 .btn.ghost{ background:#f0f0f0; color:#111 }
 
 /* Selects & Inputs */
-.select,
-select,
-input[type="number"],
-input[type="text"]{
-  font-size:18px;
-  padding:12px;
-  width:90%;
-  margin:10px 0;
-  border-radius:8px;
-  background:#222;
-  color:#fff;
-  border:1px solid var(--green);
-  text-align:center;
+.select, select, input[type="number"], input[type="text"]{
+  font-size:18px; padding:12px; width:90%; margin:10px 0;
+  border-radius:8px; background:#222; color:#fff;
+  border:1px solid var(--green); text-align:center;
 }
 
 /* Tables */
 .table{
-  width:100%;
-  border-collapse:collapse;
-  margin-top:20px;
-  background:#fff;
-  color:#000;
-  border-radius:10px;
-  overflow:hidden;
+  width:100%; border-collapse:collapse; margin-top:20px;
+  background:#fff; color:#000; border-radius:10px; overflow:hidden;
   border:2px solid var(--border);
 }
-.table th, .table td{
-  border:2px solid var(--border);
-  padding:10px;
-  text-align:center;
-}
-.table th{
-  background:var(--green);
-  color:#fff
-}
+.table th, .table td{ border:2px solid var(--border); padding:10px; text-align:center; }
+.table th{ background:var(--green); color:#fff }
 
 /* Product grid & buttons */
 .product-grid,
 .product-grid > div{
   display:grid;
   grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));
-  gap:20px;
-  width:100%;
-  max-width:600px;
-  margin-inline:auto;
+  gap:20px; width:100%; max-width:600px; margin-inline:auto;
 }
-
 .drink-btn{
-  display:flex;
-  align-items:center;
-  justify-content:flex-start;
-  padding:10px 15px;
-  font-size:18px;
-  border:none;
-  border-radius:10px;
-  background:var(--btn);
-  color:#fff;
-  transition:transform .2s, background .2s;
-  width:90%;
-  max-width:250px;
-  text-align:left;
+  display:flex; align-items:center; justify-content:flex-start;
+  padding:10px 15px; font-size:18px; border:none; border-radius:10px;
+  background:var(--btn); color:#fff; transition:transform .2s, background .2s;
+  width:90%; max-width:250px; text-align:left;
 }
 .drink-btn:hover{ background:var(--green-d); transform:scale(1.07) }
-.drink-btn img{
-  height:40px;
-  width:40px;
-  object-fit:contain;
-  margin-right:15px;
-  border-radius:5px
-}
+.drink-btn img{ height:40px; width:40px; object-fit:contain; margin-right:15px; border-radius:5px }
 
 /* Toast */
 .toast{
-  position:fixed;
-  bottom:30px;
-  left:50%;
-  transform:translateX(-50%);
-  background:var(--green);
-  color:#fff;
-  padding:12px 20px;
-  border-radius:10px;
-  font-size:18px;
-  z-index:1000;
-  transition:opacity .5s;
+  position:fixed; bottom:30px; left:50%; transform:translateX(-50%);
+  background:var(--green); color:#fff; padding:12px 20px; border-radius:10px;
+  font-size:18px; z-index:1000; transition:opacity .5s;
 }

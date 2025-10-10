@@ -87,3 +87,4 @@ async function refreshTotals() {
     .map((u) => `<tr><td>${esc(u.name)}</td><td>${u.total_drinks || 0}</td></tr>`)
     .join('');
 }
+window.undoLastDrink = undoLastDrink;
