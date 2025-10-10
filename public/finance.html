@@ -4,24 +4,20 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Turf Lijst – Finance</title>
-
-  <!-- Favicon + Styles -->
-  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="alternate icon" href="../favicon.ico">
-  <link rel="stylesheet" href="../css/app.css" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body class="bg-train">
   <div class="content-wrapper">
     <h1>📊 Finance</h1>
 
-    <!-- Nav -->
     <div style="margin-bottom:6px">
       <button class="btn" onclick="location.href='./index.html'">🏠 Terug naar start</button>
       <button class="btn" onclick="location.href='./history.html'">📜 Geschiedenis</button>
       <button class="btn" onclick="location.href='./admin.html'">🔐 Admin</button>
     </div>
 
-    <!-- KPI's -->
     <h2>Overzicht</h2>
     <table class="table">
       <tbody>
@@ -31,14 +27,12 @@
       </tbody>
     </table>
 
-    <!-- Verkoop per product -->
     <h2>Verkochte blikjes per product</h2>
     <table class="table">
       <thead><tr><th>Product</th><th>Aantal</th></tr></thead>
       <tbody id="tbl-sold-per-product"></tbody>
     </table>
 
-    <!-- Betalingen registreren -->
     <h2>Betaling registreren</h2>
     <div>
       <label for="pay-user">Gebruiker</label><br />
@@ -50,7 +44,6 @@
       <button class="btn" id="btn-add-payment">➕ Registreren</button>
     </div>
 
-    <!-- Betalingen lijst + filter -->
     <h2>Betalingen</h2>
     <div>
       <label for="filter-user">Filter op gebruiker</label><br />
@@ -62,7 +55,6 @@
     </table>
   </div>
 
-  <!-- Modules -->
-  <script type="module" src="../js/pages/finance.page.js"></script>
+  <script type="module" src="/js/pages/finance.page.js"></script>
 </body>
 </html>

@@ -4,31 +4,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Turf Lijst – Admin</title>
-
-  <!-- Favicon + Styles -->
-  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="alternate icon" href="../favicon.ico">
-  <link rel="stylesheet" href="../css/app.css" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body class="bg-train">
   <div class="content-wrapper">
     <h1>🔐 Admin Dashboard</h1>
 
-    <!-- Navigatie -->
     <div style="margin-bottom:6px">
       <button class="btn" onclick="location.href='./index.html'">🏠 Terug naar start</button>
       <button class="btn" onclick="location.href='./finance.html'">📊 Finance</button>
       <button class="btn" onclick="location.href='./stock.html'">📦 Voorraad</button>
     </div>
 
-    <!-- Gebruikersbeheer -->
     <h2>Gebruikersbeheer</h2>
     <table class="table">
       <thead><tr><th>Naam</th><th>Totaalbedrag (€)</th><th>Drankjes</th><th>Acties</th></tr></thead>
       <tbody id="tbl-users"></tbody>
     </table>
 
-    <!-- Productbeheer -->
     <h2>Productbeheer</h2>
     <div style="margin-bottom:10px">
       <input type="text" id="new-product-name" class="select" placeholder="Productnaam" />
@@ -41,7 +36,6 @@
     </table>
   </div>
 
-  <!-- Modules -->
-  <script type="module" src="../js/pages/admin.page.js"></script>
+  <script type="module" src="/js/pages/admin.page.js"></script>
 </body>
 </html>

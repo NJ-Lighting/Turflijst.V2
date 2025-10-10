@@ -4,24 +4,20 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Turf Lijst – Voorraad</title>
-
-  <!-- Favicon + Styles -->
-  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
-  <link rel="alternate icon" href="../favicon.ico">
-  <link rel="stylesheet" href="../css/app.css" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body class="bg-train">
   <div class="content-wrapper">
     <h1>📦 Voorraadbeheer</h1>
 
-    <!-- Navigatie -->
     <div style="margin-bottom:6px">
       <button class="btn" onclick="location.href='./index.html'">🏠 Terug naar start</button>
       <button class="btn" onclick="location.href='./admin.html'">🔐 Admin</button>
       <button class="btn" onclick="location.href='./finance.html'">📊 Finance</button>
     </div>
 
-    <!-- Nieuwe batch toevoegen -->
     <h2>Nieuwe batch toevoegen</h2>
     <div>
       <label for="batch-product">Product</label><br />
@@ -45,7 +41,6 @@
       <div style="margin-top:8px" id="calc-hint" class="muted"></div>
     </div>
 
-    <!-- Overzicht batches (alleen > 0) -->
     <h2>Actieve batches (FIFO)</h2>
     <table class="table">
       <thead>
@@ -62,7 +57,6 @@
       <tbody id="tbl-batches"></tbody>
     </table>
 
-    <!-- Voorraad per product -->
     <h2>Voorraad per product</h2>
     <table class="table">
       <thead><tr><th>Product</th><th>Totale voorraad</th></tr></thead>
@@ -70,7 +64,6 @@
     </table>
   </div>
 
-  <!-- Modules -->
-  <script type="module" src="../js/pages/stock.page.js"></script>
+  <script type="module" src="/js/pages/stock.page.js"></script>
 </body>
 </html>
