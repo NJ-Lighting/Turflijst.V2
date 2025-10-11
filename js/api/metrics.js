@@ -1,21 +1,17 @@
 // /js/api/metrics.js
 // Centrale metriek-functies voor alle pagina's.
 //
-// Returned per gebruiker:
-// - total:   som van prijzen van gelogde drankjes (op basis van actuele productprijs)
-// - count:   aantal gelogde drankjes
-// - paid:    som van geregistreerde betalingen
-// - balance: total - paid
-// - WIcreations: boolean (voor UI-sorting/labeling)
+// fetchUserMetrics: per gebruiker total, count, paid, balance, WIcreations
+// fetchUserDrinkPivot: volledige pivot-tabel (productenlijst + rijen met counts)
+
 export async function fetchUserMetrics(supabase) {
-  // 1) Users (incl. WIcreations-vlag zoals V1)
   const { data: users, error: uErr } = await supabase
     .from('users')
     .select('id, name, "WIcreations"')
     .order('name', { ascending: true });
   if (uErr) throw uErr;
 
-  // 2) Drinks + price (join). Als join faalt (bv. permissies), fallback met extra query.
+  // Drinks + price (join) met fallback
   let drinkRows = [];
   let joinError = null;
   try {
@@ -24,9 +20,7 @@ export async function fetchUserMetrics(supabase) {
       .select('user_id, product_id, products(price)');
     joinError = error;
     if (!error && data) drinkRows = data;
-  } catch (e) {
-    joinError = e;
-  }
+  } catch (e) { joinError = e; }
 
   if (joinError) {
     const [
@@ -48,14 +42,13 @@ export async function fetchUserMetrics(supabase) {
       price: priceMap[r.product_id] ?? 0,
     }));
   } else {
-    // normaliseer join-resultaat
     drinkRows = (drinkRows || []).map(r => ({
       user_id: r.user_id,
       price: toNumber(r?.products?.price),
     }));
   }
 
-  // 3) Reduce → totals / counts per user_id
+  // Reduce → totals / counts per user_id
   const totals = new Map();
   const counts = new Map();
   for (const row of (drinkRows || [])) {
@@ -65,49 +58,67 @@ export async function fetchUserMetrics(supabase) {
     counts.set(u, (counts.get(u) || 0) + 1);
   }
 
-  // 4) Betalingen per user (som). Bij RLS-issues → treated as 0 (geen throw).
+  // Betalingen (zachte fallback bij RLS)
   let pays = [];
   try {
     const res = await supabase.from('payments').select('user_id, amount');
     if (res.error) throw res.error;
     pays = res.data || [];
-  } catch {
-    pays = [];
-  }
+  } catch { pays = []; }
   const paid = new Map();
   for (const p of pays) {
     const amt = toNumber(p?.amount);
     paid.set(p.user_id, (paid.get(p.user_id) || 0) + amt);
   }
 
-  // 5) Combineer alles
-  const rowsOut = (users || []).map(u => {
-    const total   = totals.get(u.id) ?? 0;
-    const count   = counts.get(u.id) ?? 0;
-    const paidAmt = paid.get(u.id)   ?? 0;
-    const balance = total - paidAmt;
-    return {
-      id: u.id,
-      name: u.name,
-      WIcreations: !!u.WIcreations,
-      total,
-      count,
-      paid: paidAmt,
-      balance,
-    };
-  });
+  // Combineer
+  const rowsOut = (users || []).map(u => ({
+    id: u.id,
+    name: u.name,
+    WIcreations: !!u.WIcreations,
+    total:   totals.get(u.id) ?? 0,
+    count:   counts.get(u.id) ?? 0,
+    paid:    paid.get(u.id)   ?? 0,
+    balance: (totals.get(u.id) ?? 0) - (paid.get(u.id) ?? 0),
+  }));
 
-  // WIcreations bovenaan, daarna alfabetisch op naam
-  rowsOut.sort((a, b) => {
-    if (a.WIcreations !== b.WIcreations) return a.WIcreations ? -1 : 1;
-    return a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' });
-  });
+  // Sortering
+  rowsOut.sort((a,b) => (a.WIcreations !== b.WIcreations)
+    ? (a.WIcreations ? -1 : 1)
+    : a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' }));
 
   return rowsOut;
 }
 
-// -------- Helpers --------
-function toNumber(x) {
-  const n = Number(x);
-  return Number.isFinite(n) ? n : 0;
+// Pivot: producten (kolommen) + rows = [{user, counts:[…]}]
+export async function fetchUserDrinkPivot(supabase) {
+  const { data: rows, error } = await supabase
+    .from('drinks')
+    .select('user_id, users(name), products(name)');
+  if (error) throw error;
+
+  const usersMap = new Map();
+  const productSet = new Set();
+
+  for (const r of (rows || [])) {
+    const user = r?.users?.name || 'Onbekend';
+    const prod = r?.products?.name || 'Onbekend';
+    productSet.add(prod);
+    if (!usersMap.has(user)) usersMap.set(user, new Map());
+    const m = usersMap.get(user);
+    m.set(prod, (m.get(prod) || 0) + 1);
+  }
+
+  const coll = new Intl.Collator('nl', { sensitivity: 'base', numeric: true });
+  const products = Array.from(productSet).sort(coll.compare);
+  const users    = Array.from(usersMap.keys()).sort(coll.compare);
+
+  const outRows = users.map(u => ({
+    user: u,
+    counts: products.map(p => usersMap.get(u).get(p) || 0),
+  }));
+
+  return { products, rows: outRows };
 }
+
+function toNumber(x){ const n = Number(x); return Number.isFinite(n) ? n : 0; }
