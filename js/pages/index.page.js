@@ -38,11 +38,24 @@ async function loadUsers() {
 }
 
 async function loadProducts() {
+  // 1) Producten
   const { data: products, error } = await supabase
     .from('products')
     .select('id, name, price, image_url')
     .order('name', { ascending: true });
   if (error) return console.error(error);
+
+  // 2) Actieve batches en som per product
+  const { data: batches, error: stockErr } = await supabase
+    .from('stock_batches')
+    .select('product_id, quantity')
+    .gt('quantity', 0);
+  if (stockErr) return console.error(stockErr);
+  const stockMap = new Map();
+  (batches || []).forEach(b => {
+    const q = Number(b.quantity) || 0;
+    stockMap.set(b.product_id, (stockMap.get(b.product_id) || 0) + q);
+  });
 
   const grid = $('#product-buttons');
   if (!grid) return;
@@ -51,7 +64,8 @@ async function loadProducts() {
 
   const BUCKET_URL = 'https://stmpommlhkokcjkwivfc.supabase.co/storage/v1/object/public/product-images/';
 
-  (products || []).forEach(p => {
+  // 3) Alleen producten met voorraad renderen
+  (products || []).filter(p => (stockMap.get(p.id) || 0) > 0).forEach(p => {
     const wrap = document.createElement('div');
     const btn  = document.createElement('button');
     btn.className = 'btn drink-btn';
@@ -74,53 +88,78 @@ window.logDrink = async (productId) => {
   await supabase.from('drinks').insert([{ user_id: userId, product_id: productId }]);
   await supabase.rpc('update_user_balance', { user_id: userId, amount: price }).catch(() => {});
 
+  // (1) FIFO voorraad verlagen
+  const { data: fifo, error: bErr } = await supabase
+    .from('stock_batches')
+    .select('*')
+    .eq('product_id', productId)
+    .gt('quantity', 0)
+    .order('created_at', { ascending: true });
+  if (!bErr && Array.isArray(fifo)) {
+    let remaining = 1;
+    for (const batch of fifo) {
+      if (remaining <= 0) break;
+      const take = Math.min(remaining, Number(batch.quantity) || 0);
+      if (take > 0) {
+        await supabase.from('stock_batches')
+          .update({ quantity: (Number(batch.quantity) || 0) - take })
+          .eq('id', batch.id);
+        remaining -= take;
+      }
+    }
+    // (2) Productprijs bijwerken uit oudste batch
+    if (fifo.length > 0 && fifo[0]?.price_per_piece != null) {
+      await supabase.from('products')
+        .update({ price: fifo[0].price_per_piece })
+        .eq('id', productId);
+    }
+  }
+
+  // (3) Products herladen
+  await loadProducts();
+  // (4) User dropdown resetten
+  const sel = $('#user'); if (sel) sel.value = '';
+
   toast('✅ Drankje toegevoegd');
   await renderTotalsFromMetrics();
   await renderPivotFromMetrics();
 };
 
 window.undoLastDrink = async () => {
-  const userId = $('#user').value;
-  if (!userId) return toast('⚠️ Kies eerst een gebruiker');
-
-  const { data, error } = await supabase
+  // (5) Globaal laatste drankje
+  const { data: last, error } = await supabase
     .from('drinks')
-    .select('id, product_id')
-    .eq('user_id', userId)
+    .select('id, user_id, product_id')
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
+  if (error || !last) return toast('❌ Geen drankje om te verwijderen');
 
-  if (error || !data) return toast('❌ Geen drankje om te verwijderen');
+  await supabase.from('drinks').delete().eq('id', last.id);
 
-  await supabase.from('drinks').delete().eq('id', data.id);
-
-  const { data: prod } = await supabase.from('products').select('price').eq('id', data.product_id).single();
+  // Balance corrigeren (met actuele productprijs)
+  const { data: prod } = await supabase.from('products').select('price').eq('id', last.product_id).single();
   const price = prod?.price || 0;
+  await supabase.rpc('update_user_balance', { user_id: last.user_id, amount: -price }).catch(() => {});
 
-  await supabase.rpc('update_user_balance', { user_id: userId, amount: -price }).catch(() => {});
-
-  // 🔁 Voorraad terugboeken: +1 in meest recente batch (of nieuwe batch maken)
-  const { data: recentBatch, error: bErr } = await supabase
+  // Voorraad terugboeken: +1 op meest recente batch of nieuwe batch maken
+  const { data: recentBatch, error: rbErr } = await supabase
     .from('stock_batches')
     .select('id, quantity, price_per_piece')
-    .eq('product_id', data.product_id)
+    .eq('product_id', last.product_id)
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
-
-  if (!bErr && recentBatch) {
-    await supabase
-      .from('stock_batches')
+  if (!rbErr && recentBatch) {
+    await supabase.from('stock_batches')
       .update({ quantity: (Number(recentBatch.quantity) || 0) + 1 })
       .eq('id', recentBatch.id);
   } else {
-    await supabase
-      .from('stock_batches')
-      .insert([{ product_id: data.product_id, quantity: 1, price_per_piece: price }]);
+    await supabase.from('stock_batches')
+      .insert([{ product_id: last.product_id, quantity: 1, price_per_piece: price }]);
   }
 
-  // ♻️ Producten opnieuw laden zodat de voorraad op het grid direct klopt
+  // Products herladen na undo
   await loadProducts();
 
   toast('⏪ Laatste drankje verwijderd');
