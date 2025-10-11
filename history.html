@@ -7,16 +7,21 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/nav.css" />
 </head>
 <body class="bg-train">
+  <header class="site-nav" role="navigation" aria-label="Hoofdnavigatie">
+    <nav class="nav">
+      <a href="/index.html">Home</a>
+      <a href="/admin.html">Admin</a>
+      <a href="/finance.html">Finance</a>
+      <a href="/stock.html">Voorraad</a>
+      <a href="/history.html" aria-current="page">History</a>
+    </nav>
+  </header>
+
   <div class="content-wrapper">
     <h1>📜 Geschiedenis</h1>
-
-    <div style="margin-bottom:6px">
-      <button class="btn" onclick="location.href='/index.html'">🏠 Terug naar start</button>
-      <button class="btn" onclick="location.href='/finance.html'">📊 Finance</button>
-      <button class="btn" onclick="location.href='/admin.html'">🔐 Admin</button>
-    </div>
 
     <h2>Filter</h2>
     <div>
