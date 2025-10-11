@@ -13,9 +13,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   await renderPivotFromMetrics();
 });
 
-// Anti-spam flags + (robuuste) UI-disable
+// Anti-spam flags + (robuuste) UI-disable + tijdstempel-throttle
 let isLogging = false;
 let isUndoing = false;
+let lastLogAt = 0;
+let lastUndoAt = 0;
+const THROTTLE_MS = 600;
 
 function setUiBusy(busy) {
   document.querySelectorAll('#product-buttons button.btn').forEach(b => b.disabled = busy);
@@ -94,7 +97,10 @@ async function loadProducts() {
 }
 
 window.logDrink = async (productId) => {
-  if (isLogging) return; // debounce double-clicks
+  const now = Date.now();
+  if (isLogging || (now - lastLogAt) < THROTTLE_MS) return; // dubbelklik/spam protect
+  lastLogAt = now;
+
   isLogging = true;
   setUiBusy(true);
 
@@ -153,7 +159,10 @@ window.logDrink = async (productId) => {
 };
 
 window.undoLastDrink = async () => {
-  if (isUndoing) return; // voorkom undo-spam
+  const now = Date.now();
+  if (isUndoing || (now - lastUndoAt) < THROTTLE_MS) return; // extra throttle
+  lastUndoAt = now;
+
   isUndoing = true;
   setUiBusy(true);
 
@@ -173,7 +182,7 @@ window.undoLastDrink = async () => {
 
   await supabase.from('drinks').delete().eq('id', last.id);
 
-  // Balance corrigeren (met actuele productprijs) – index gebruikt dit niet meer, but price nodig bij nieuwe batch
+  // Huidige productprijs nodig voor evt. nieuwe batch
   const { data: prod } = await supabase.from('products').select('price').eq('id', last.product_id).single();
   const price = prod?.price || 0;
 
