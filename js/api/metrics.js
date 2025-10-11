@@ -2,7 +2,7 @@
 // Centrale metriek-functies voor alle pagina's.
 //
 // fetchUserMetrics     → voor Finance/overzichten (all-time drinks/payments)
-// fetchUserBalances    → voor Index (toont users.balance, nooit negatief)
+// fetchUserBalances    → voor Index (via metrics; nooit negatief tonen)
 // fetchUserDrinkPivot  → pivot (users × producten) voor Index
 
 export async function fetchUserMetrics(supabase) {
@@ -92,25 +92,19 @@ export async function fetchUserMetrics(supabase) {
 }
 
 export async function fetchUserBalances(supabase){
-  const { data, error } = await supabase
-    .from('users')
-    .select('id, name, "WIcreations", balance')
-    .order('name', { ascending: true });
-  if (error) throw error;
-
-  const rows = (data || []).map(u => ({
-    id: u.id,
-    name: u.name,
-    WIcreations: !!u.WIcreations,
-    balance: Math.max(0, Number(u.balance || 0)),
+  // Robuust: altijd via metrics; voorkomt 400’s op users.balance
+  const metrics = await fetchUserMetrics(supabase);
+  const rows = (metrics || []).map(m => ({
+    id: m.id,
+    name: m.name,
+    WIcreations: !!m.WIcreations,
+    balance: Math.max(0, Number(m.balance || 0)),
   }));
-
   rows.sort((a,b) =>
     (a.WIcreations !== b.WIcreations)
       ? (a.WIcreations ? -1 : 1)
       : a.name.localeCompare(b.name, 'nl', { sensitivity:'base' })
   );
-
   return rows;
 }
 
