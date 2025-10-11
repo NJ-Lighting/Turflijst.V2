@@ -31,11 +31,23 @@
 
     <h2>Beschikbare Drankjes</h2>
     <div id="product-buttons" class="product-grid"></div>
-    <button id="undo-btn" class="btn btn-warn block" onclick="undoLastDrink()">⏪ Undo laatste drankje</button>
+    <button
+      id="undo-btn"
+      class="btn btn-warn block"
+      onclick="undoLastDrink(this)"
+      disabled
+      aria-disabled="true"
+      title="Eerst een drankje loggen, daarna kun je één keer undo doen"
+    >⏪ Undo laatste drankje</button>
 
     <h3 class="section-title">Totaal te betalen</h3>
     <table class="table">
-      <thead><tr><th>Gebruiker</th><th class="right">Bedrag</th></tr></thead>
+      <thead>
+        <tr>
+          <th scope="col">Gebruiker</th>
+          <th class="right" scope="col">Bedrag</th>
+        </tr>
+      </thead>
       <tbody id="totalToPayList"></tbody>
     </table>
 
