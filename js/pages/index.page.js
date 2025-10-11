@@ -90,7 +90,13 @@ async function loadProducts() {
     btn.type = 'button';
     const imgTag = p.image_url ? `<img src="${BUCKET_URL + esc(p.image_url)}" alt="${esc(p.name)}">` : '';
     btn.innerHTML = `${imgTag}<div><div>${esc(p.name)}</div><div>${euro(p.price)}</div></div>`;
-    btn.addEventListener('click', () => logDrink(p.id)); // UUID-proof
+    // Disable de knop direct bij klik; voorkomt dubbel fire
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try { await logDrink(p.id); }
+      finally { btn.disabled = false; }
+    });
     wrap.appendChild(btn);
     grid.appendChild(wrap);
   });
@@ -158,9 +164,15 @@ window.logDrink = async (productId) => {
   }
 };
 
-window.undoLastDrink = async () => {
+window.undoLastDrink = async (el) => {
+  // Disable element meteen (komt binnen als `this` vanuit HTML)
+  if (el && !el.disabled) el.disabled = true;
+
   const now = Date.now();
-  if (isUndoing || (now - lastUndoAt) < THROTTLE_MS) return; // extra throttle
+  if (isUndoing || (now - lastUndoAt) < THROTTLE_MS) {
+    if (el) el.disabled = false;
+    return;
+  }
   lastUndoAt = now;
 
   isUndoing = true;
@@ -177,16 +189,17 @@ window.undoLastDrink = async () => {
     toast('❌ Geen drankje om te verwijderen');
     setUiBusy(false);
     isUndoing = false;
+    if (el) el.disabled = false;
     return;
   }
 
   await supabase.from('drinks').delete().eq('id', last.id);
 
-  // Huidige productprijs nodig voor evt. nieuwe batch
+  // Huidige productprijs voor evt. nieuwe batch
   const { data: prod } = await supabase.from('products').select('price').eq('id', last.product_id).single();
   const price = prod?.price || 0;
 
-  // Voorraad terugboeken: +1 op meest recente batch of nieuwe batch maken
+  // Voorraad terugboeken
   const { data: recentBatch, error: rbErr } = await supabase
     .from('stock_batches')
     .select('id, quantity, price_per_piece')
@@ -213,6 +226,7 @@ window.undoLastDrink = async () => {
   } finally {
     setUiBusy(false);
     isUndoing = false;
+    if (el) el.disabled = false;
   }
 };
 
