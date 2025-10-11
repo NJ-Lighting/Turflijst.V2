@@ -72,7 +72,7 @@ async function loadProducts() {
     btn.type = 'button';
     const imgTag = p.image_url ? `<img src="${BUCKET_URL + esc(p.image_url)}" alt="${esc(p.name)}">` : '';
     btn.innerHTML = `${imgTag}<div><div>${esc(p.name)}</div><div>${euro(p.price)}</div></div>`;
-    btn.addEventListener('click', () => logDrink(p.id)); // UUID-proof
+    btn.addEventListener('click', () => logDrink(p.id));
     wrap.appendChild(btn);
     grid.appendChild(wrap);
   });
@@ -86,11 +86,6 @@ window.logDrink = async (productId) => {
   const price = product?.price || 0;
 
   await supabase.from('drinks').insert([{ user_id: userId, product_id: productId }]);
-  try {
-    await supabase.rpc('update_user_balance', { user_id: userId, amount: price });
-  } catch {
-    console.warn('Kon balans niet updaten (niet kritisch).');
-  }
 
   // (1) FIFO voorraad verlagen
   const { data: fifo, error: bErr } = await supabase
@@ -141,14 +136,10 @@ window.undoLastDrink = async () => {
 
   await supabase.from('drinks').delete().eq('id', last.id);
 
-  // Balance corrigeren (met actuele productprijs)
+  // Balance corrigeren (met actuele productprijs) – index gebruikt dit niet meer, maar we verwijderen RPC om 404 te vermijden
   const { data: prod } = await supabase.from('products').select('price').eq('id', last.product_id).single();
   const price = prod?.price || 0;
-  try {
-    await supabase.rpc('update_user_balance', { user_id: last.user_id, amount: -price });
-  } catch {
-    console.warn('Kon balans niet updaten bij undo (niet kritisch).');
-  }
+  // (geen rpc-call meer)
 
   // Voorraad terugboeken: +1 op meest recente batch of nieuwe batch maken
   const { data: recentBatch, error: rbErr } = await supabase
