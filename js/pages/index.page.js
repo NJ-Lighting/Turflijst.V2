@@ -74,64 +74,53 @@ window.logDrink = async (productId) => {
   await supabase.from('drinks').insert([{ user_id: userId, product_id: productId }]);
   await supabase.rpc('update_user_balance', { user_id: userId, amount: price }).catch(() => {});
 
-  // (1) FIFO voorraad verlagen in stock_batches
-  const { data: batches, error: bErr } = await supabase
-    .from('stock_batches')
-    .select('*')
-    .eq('product_id', productId)
-    .gt('quantity', 0)
-    .order('created_at', { ascending: true });
-
-  if (!bErr && Array.isArray(batches)) {
-    let remaining = 1;
-    for (const batch of batches) {
-      if (remaining <= 0) break;
-      const take = Math.min(remaining, Number(batch.quantity) || 0);
-      if (take > 0) {
-        await supabase.from('stock_batches')
-          .update({ quantity: (Number(batch.quantity) || 0) - take })
-          .eq('id', batch.id);
-        remaining -= take;
-      }
-    }
-    // (2) Productprijs bijwerken uit oudste batch
-    if (batches.length > 0 && batches[0]?.price_per_piece != null) {
-      await supabase.from('products')
-        .update({ price: batches[0].price_per_piece })
-        .eq('id', productId);
-    }
-  }
-
-  // (3) Products herladen
-  await loadProducts();
-
-  // (4) User dropdown resetten
-  const sel = $('#user'); if (sel) sel.value = '';
-
   toast('✅ Drankje toegevoegd');
   await renderTotalsFromMetrics();
   await renderPivotFromMetrics();
 };
 
 window.undoLastDrink = async () => {
-  // (5) Undo laatste drankje GLOBAAL
-  const { data: last, error } = await supabase
+  const userId = $('#user').value;
+  if (!userId) return toast('⚠️ Kies eerst een gebruiker');
+
+  const { data, error } = await supabase
     .from('drinks')
-    .select('id, user_id, product_id')
+    .select('id, product_id')
+    .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
 
-  if (error || !last) return toast('❌ Geen drankje om te verwijderen');
+  if (error || !data) return toast('❌ Geen drankje om te verwijderen');
 
-  await supabase.from('drinks').delete().eq('id', last.id);
+  await supabase.from('drinks').delete().eq('id', data.id);
 
-  const { data: prod } = await supabase.from('products').select('price').eq('id', last.product_id).single();
+  const { data: prod } = await supabase.from('products').select('price').eq('id', data.product_id).single();
   const price = prod?.price || 0;
 
-  await supabase.rpc('update_user_balance', { user_id: last.user_id, amount: -price }).catch(() => {});
+  await supabase.rpc('update_user_balance', { user_id: userId, amount: -price }).catch(() => {});
 
-  // (3) Products herladen ook bij undo
+  // 🔁 Voorraad terugboeken: +1 in meest recente batch (of nieuwe batch maken)
+  const { data: recentBatch, error: bErr } = await supabase
+    .from('stock_batches')
+    .select('id, quantity, price_per_piece')
+    .eq('product_id', data.product_id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!bErr && recentBatch) {
+    await supabase
+      .from('stock_batches')
+      .update({ quantity: (Number(recentBatch.quantity) || 0) + 1 })
+      .eq('id', recentBatch.id);
+  } else {
+    await supabase
+      .from('stock_batches')
+      .insert([{ product_id: data.product_id, quantity: 1, price_per_piece: price }]);
+  }
+
+  // ♻️ Producten opnieuw laden zodat de voorraad op het grid direct klopt
   await loadProducts();
 
   toast('⏪ Laatste drankje verwijderd');
