@@ -5,17 +5,27 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>🍺 Turflijst</title>
   <link rel="stylesheet" href="/css/app.css" />
+  <!-- Minimale inline styles voor sticky navigatie (geen bestaande styles overschreven) -->
+  <style>
+    .site-nav{position:sticky;top:0;z-index:1000;background:rgba(0,0,0,.65);backdrop-filter:saturate(1.1) blur(6px);border-bottom:1px solid rgba(255,255,255,.12)}
+    .site-nav .nav{max-width:1100px;margin:0 auto;display:flex;gap:.75rem;align-items:center;padding:.5rem 1rem}
+    .site-nav a{color:#fff;text-decoration:none;padding:.4rem .6rem;border-radius:.5rem}
+    .site-nav a[aria-current="page"]{outline:2px solid rgba(255,255,255,.35)}
+  </style>
 </head>
 <body class="bg-train">
-  <div class="content-wrapper">
-    <div class="admin-link">
-      <button class="btn" onclick="(function(){
-        const pin = prompt('Voer admin PIN in:');
-        if (pin === '1915') location.href = '/admin.html';
-        else alert('❌ Onjuiste PIN');
-      })()">Naar Admin</button>
-    </div>
+  <!-- Sticky navigatie bovenaan -->
+  <header class="site-nav" role="navigation" aria-label="Hoofdnavigatie">
+    <nav class="nav">
+      <a href="/index.html" aria-current="page">Home</a>
+      <a href="/admin.html">Admin</a>
+      <a href="/finance.html">Finance</a>
+      <a href="/stock.html">Voorraad</a>
+      <a href="/history.html">History</a>
+    </nav>
+  </header>
 
+  <div class="content-wrapper">
     <h1>🍺 Turflijst</h1>
     <p>Kies een gebruiker en klik op een drankje om te turven</p>
 
@@ -38,11 +48,10 @@
     </table>
 
     <h3 class="section-title">Drankjes per gebruiker</h3>
-<table class="table">
-  <thead id="userDrinkTotalsHead"></thead>
-  <tbody id="userDrinkTotalsBody"></tbody>
-</table>
-
+    <table class="table">
+      <thead id="userDrinkTotalsHead"></thead>
+      <tbody id="userDrinkTotalsBody"></tbody>
+    </table>
   </div>
 
   <!-- Modules -->
