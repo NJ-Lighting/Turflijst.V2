@@ -19,6 +19,8 @@ let isUndoing = false;
 let lastLogAt = 0;
 let lastUndoAt = 0;
 const THROTTLE_MS = 600;
+// Max 1 undo per laatst gelogde actie
+let canUndo = false;
 
 function setUiBusy(busy) {
   document.querySelectorAll('#product-buttons button.btn').forEach(b => b.disabled = busy);
@@ -56,14 +58,12 @@ async function loadUsers() {
 }
 
 async function loadProducts() {
-  // 1) Producten
   const { data: products, error } = await supabase
     .from('products')
     .select('id, name, price, image_url')
     .order('name', { ascending: true });
   if (error) return console.error(error);
 
-  // 2) Actieve batches en som per product
   const { data: batches, error: stockErr } = await supabase
     .from('stock_batches')
     .select('product_id, quantity')
@@ -82,7 +82,6 @@ async function loadProducts() {
 
   const BUCKET_URL = 'https://stmpommlhkokcjkwivfc.supabase.co/storage/v1/object/public/product-images/';
 
-  // 3) Alleen producten met voorraad renderen
   (products || []).filter(p => (stockMap.get(p.id) || 0) > 0).forEach(p => {
     const wrap = document.createElement('div');
     const btn  = document.createElement('button');
@@ -90,7 +89,6 @@ async function loadProducts() {
     btn.type = 'button';
     const imgTag = p.image_url ? `<img src="${BUCKET_URL + esc(p.image_url)}" alt="${esc(p.name)}">` : '';
     btn.innerHTML = `${imgTag}<div><div>${esc(p.name)}</div><div>${euro(p.price)}</div></div>`;
-    // Disable de knop direct bij klik; voorkomt dubbel fire
     btn.addEventListener('click', async () => {
       if (btn.disabled) return;
       btn.disabled = true;
@@ -104,7 +102,7 @@ async function loadProducts() {
 
 window.logDrink = async (productId) => {
   const now = Date.now();
-  if (isLogging || (now - lastLogAt) < THROTTLE_MS) return; // dubbelklik/spam protect
+  if (isLogging || (now - lastLogAt) < THROTTLE_MS) return;
   lastLogAt = now;
 
   isLogging = true;
@@ -122,7 +120,6 @@ window.logDrink = async (productId) => {
 
   await supabase.from('drinks').insert([{ user_id: userId, product_id: productId }]);
 
-  // (1) FIFO voorraad verlagen
   const { data: fifo, error: bErr } = await supabase
     .from('stock_batches')
     .select('*')
@@ -141,7 +138,6 @@ window.logDrink = async (productId) => {
         remaining -= take;
       }
     }
-    // (2) Productprijs bijwerken uit oudste batch
     if (fifo.length > 0 && fifo[0]?.price_per_piece != null) {
       await supabase.from('products')
         .update({ price: fifo[0].price_per_piece })
@@ -149,15 +145,15 @@ window.logDrink = async (productId) => {
     }
   }
 
-  // (3) Products herladen
   await loadProducts();
-  // (4) User dropdown resetten
   const sel = $('#user'); if (sel) sel.value = '';
 
   try {
     toast('✅ Drankje toegevoegd');
     await renderTotalsFromMetrics();
     await renderPivotFromMetrics();
+    // precies 1 undo toestaan
+    canUndo = true;
   } finally {
     setUiBusy(false);
     isLogging = false;
@@ -165,7 +161,9 @@ window.logDrink = async (productId) => {
 };
 
 window.undoLastDrink = async (el) => {
-  // Disable element meteen (komt binnen als `this` vanuit HTML)
+  // Sta maar 1 undo toe sinds de laatste log
+  if (!canUndo) { toast('Niets om ongedaan te maken'); return; }
+
   if (el && !el.disabled) el.disabled = true;
 
   const now = Date.now();
@@ -178,7 +176,6 @@ window.undoLastDrink = async (el) => {
   isUndoing = true;
   setUiBusy(true);
 
-  // (5) Globaal laatste drankje
   const { data: last, error } = await supabase
     .from('drinks')
     .select('id, user_id, product_id')
@@ -195,11 +192,9 @@ window.undoLastDrink = async (el) => {
 
   await supabase.from('drinks').delete().eq('id', last.id);
 
-  // Huidige productprijs voor evt. nieuwe batch
   const { data: prod } = await supabase.from('products').select('price').eq('id', last.product_id).single();
   const price = prod?.price || 0;
 
-  // Voorraad terugboeken
   const { data: recentBatch, error: rbErr } = await supabase
     .from('stock_batches')
     .select('id, quantity, price_per_piece')
@@ -216,13 +211,14 @@ window.undoLastDrink = async (el) => {
       .insert([{ product_id: last.product_id, quantity: 1, price_per_piece: price }]);
   }
 
-  // Products herladen na undo
   await loadProducts();
 
   try {
     toast('⏪ Laatste drankje verwijderd');
     await renderTotalsFromMetrics();
     await renderPivotFromMetrics();
+    // verdere undos blokkeren tot er weer een log is
+    canUndo = false;
   } finally {
     setUiBusy(false);
     isUndoing = false;
