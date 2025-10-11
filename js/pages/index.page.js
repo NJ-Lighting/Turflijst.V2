@@ -1,4 +1,4 @@
-import { $, $$, toast, euro, esc } from '../core.js';
+import { $, toast, euro, esc } from '../core.js';
 import { supabase } from '../supabase.client.js';
 import { fetchUserDrinkPivot, fetchUserTotalsCurrentPrice } from '../api/metrics.js';
 
@@ -136,10 +136,9 @@ window.undoLastDrink = async () => {
 
   await supabase.from('drinks').delete().eq('id', last.id);
 
-  // Balance corrigeren (met actuele productprijs) – index gebruikt dit niet meer, maar we verwijderen RPC om 404 te vermijden
+  // Balance corrigeren (met actuele productprijs) – index gebruikt dit niet meer, but price nodig bij nieuwe batch
   const { data: prod } = await supabase.from('products').select('price').eq('id', last.product_id).single();
   const price = prod?.price || 0;
-  // (geen rpc-call meer)
 
   // Voorraad terugboeken: +1 op meest recente batch of nieuwe batch maken
   const { data: recentBatch, error: rbErr } = await supabase
@@ -169,7 +168,7 @@ window.undoLastDrink = async () => {
 async function renderTotalsFromMetrics(){
   try{
     $('#totalToPayList').innerHTML = `<tr><td colspan="2">Laden…</td></tr>`;
-    const rows = await fetchUserTotalsCurrentPrice(supabase); // V1-conform
+    const rows = await fetchUserTotalsCurrentPrice(supabase);
     $('#totalToPayList').innerHTML =
       (rows || []).map(r => `<tr><td>${esc(r.name)}</td><td class="right">${euro(r.amount)}</td></tr>`).join('') ||
       `<tr><td colspan="2" style="opacity:.7">Nog geen data</td></tr>`;
