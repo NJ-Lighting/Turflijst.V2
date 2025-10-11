@@ -65,7 +65,6 @@ window.logDrink = async (productId) => {
   const userId = $('#user').value;
   if (!userId) return toast('⚠️ Kies eerst een gebruiker');
 
-  // prijs ophalen voor DB-RPC (geen sommen in index)
   const { data: product } = await supabase
     .from('products')
     .select('price')
@@ -74,7 +73,6 @@ window.logDrink = async (productId) => {
   const price = product?.price || 0;
 
   await supabase.from('drinks').insert([{ user_id: userId, product_id: productId }]);
-  // balance bijhouden in DB
   await supabase.rpc('update_user_balance', { user_id: userId, amount: price });
 
   toast('✅ Drankje toegevoegd');
@@ -114,7 +112,8 @@ window.undoLastDrink = async () => {
 
 async function renderTotalsFromMetrics(){
   try{
-    const rows = await fetchUserBalances(supabase); // DB-balance, nooit negatief weergegeven
+    $('#totalToPayList').innerHTML = `<tr><td colspan="2">Laden…</td></tr>`;
+    const rows = await fetchUserBalances(supabase); // balance of fallback metrics; nooit negatief getoond
     $('#totalToPayList').innerHTML =
       (rows || []).map(r => `<tr><td>${esc(r.name)}</td><td class="right">${euro(r.balance)}</td></tr>`).join('')
       || `<tr><td colspan="2" style="opacity:.7">Nog geen data</td></tr>`;
