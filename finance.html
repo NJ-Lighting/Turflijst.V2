@@ -8,19 +8,20 @@
   <link rel="stylesheet" href="/css/nav.css" />
 </head>
 <body class="bg-train">
-  <header class="site-nav" role="navigation" aria-label="Hoofdnavigatie">
-    <nav class="nav">
+  <header class="site-nav" role="banner">
+    <button class="nav-toggle" aria-controls="nav-drawer" aria-expanded="false" aria-label="Menu openen">☰</button>
+    <nav id="nav-drawer" class="nav-drawer" role="navigation" aria-label="Hoofdnavigatie">
       <a href="/index.html">Home</a>
       <a href="/admin.html">Admin</a>
       <a href="/finance.html" aria-current="page">Finance</a>
       <a href="/stock.html">Voorraad</a>
       <a href="/history.html">History</a>
+      <a href="/new-user.html">Nieuwe gebruiker</a>
     </nav>
   </header>
 
   <div class="content-wrapper">
     <h1>💰 Finance Overzicht</h1>
-
     <!-- KPI’s -->
     <section class="cards grid">
       <div class="card kpi"><div class="lbl">Koelkastwaarde</div><div id="kpi-fridge" class="val">€0,00</div></div>
@@ -29,14 +30,12 @@
       <div class="card kpi"><div class="lbl">Statiegeld ontvangen</div><div id="kpi-deposit-earned" class="val">€0,00</div></div>
       <div class="card kpi"><div class="lbl">Profit/Loss</div><div id="kpi-profit" class="val">€0,00</div></div>
     </section>
-
     <!-- Buffer -->
     <section class="cards grid">
       <div class="card kpi"><div class="lbl">Buffer in</div><div id="kpi-buffer-in" class="val">€0,00</div></div>
       <div class="card kpi"><div class="lbl">Buffer uit</div><div id="kpi-buffer-out" class="val">€0,00</div></div>
       <div class="card kpi"><div class="lbl">Buffer beschikbaar</div><div id="kpi-buffer-available" class="val">€0,00</div></div>
     </section>
-
     <!-- Deposits -->
     <section class="card section">
       <h2>🏦 Statiegeld registreren</h2>
@@ -46,7 +45,6 @@
         <button id="btn-add-deposit" class="btn">Opslaan</button>
       </div>
     </section>
-
     <!-- Verkocht per product -->
     <section class="card section">
       <h2>📦 Verkocht per product</h2>
@@ -55,7 +53,6 @@
         <tbody id="tbl-sold-per-product"></tbody>
       </table>
     </section>
-
     <!-- Betalingen -->
     <section class="card section">
       <h2>💸 Betalingen</h2>
@@ -75,7 +72,6 @@
         </thead>
         <tbody id="tbl-payments"></tbody>
       </table>
-
       <div class="row">
         <select id="pay-user" class="select" title="Gebruiker"></select>
         <input id="pay-amount" class="input" type="number" inputmode="decimal" step="0.01" placeholder="Bedrag in €" />
@@ -83,7 +79,6 @@
         <button id="btn-add-payment" class="btn">Betaling toevoegen</button>
       </div>
     </section>
-
     <!-- (optioneel) Maandoverzicht -->
     <section class="card section">
       <h2>📅 Maandoverzicht</h2>
@@ -100,5 +95,6 @@
   <script type="module" src="/js/supabase.client.js"></script>
   <script type="module" src="/js/api/finance.js"></script>
   <script type="module" src="/js/pages/finance.page.js"></script>
+  <script type="module" src="/js/nav.js"></script>
 </body>
 </html>

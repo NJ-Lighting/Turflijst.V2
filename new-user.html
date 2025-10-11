@@ -10,13 +10,15 @@
   <link rel="stylesheet" href="/css/nav.css" />
 </head>
 <body class="bg-train">
-  <header class="site-nav" role="navigation" aria-label="Hoofdnavigatie">
-    <nav class="nav">
+  <header class="site-nav" role="banner">
+    <button class="nav-toggle" aria-controls="nav-drawer" aria-expanded="false" aria-label="Menu openen">☰</button>
+    <nav id="nav-drawer" class="nav-drawer" role="navigation" aria-label="Hoofdnavigatie">
       <a href="/index.html">Home</a>
       <a href="/admin.html">Admin</a>
       <a href="/finance.html">Finance</a>
       <a href="/stock.html">Voorraad</a>
       <a href="/history.html">History</a>
+      <a href="/new-user.html" aria-current="page">Nieuwe gebruiker</a>
     </nav>
   </header>
 
@@ -42,5 +44,6 @@
   </div>
 
   <script type="module" src="/js/pages/new-user.page.js"></script>
+  <script type="module" src="/js/nav.js"></script>
 </body>
 </html>
