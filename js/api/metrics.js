@@ -12,17 +12,17 @@ export async function fetchUserMetrics(supabase) {
     .order('name', { ascending: true });
   if (uErr) throw uErr;
 
+  // 2) Drankjes met voorkeur voor 'snapshot' prijs (drinks.price)
   let drinkRows = [];
-  let joinError = null;
-  try {
-    const { data, error } = await supabase
-      .from('drinks')
-      .select('user_id, product_id, products(price)');
-    joinError = error;
-    if (!error && data) drinkRows = data;
-  } catch (e) { joinError = e; }
+  let haveSnapshot = false;
 
-  if (joinError) {
+  const shot = await supabase
+    .from('drinks')
+    .select('user_id, price');
+  if (!shot.error && Array.isArray(shot.data)) {
+    haveSnapshot = true;
+    drinkRows = shot.data.map(r => ({ user_id: r.user_id, price: toNumber(r?.price) }));
+  } else {
     const [
       { data: d2, error: e1 },
       { data: prods, error: e2 },
@@ -34,45 +34,41 @@ export async function fetchUserMetrics(supabase) {
     if (e2) throw e2;
 
     const priceMap = Object.fromEntries(
-      (prods || []).map(p => [p.id, Number(p.price) || 0])
+      (prods || []).map(p => [p.id, toNumber(p.price)])
     );
     drinkRows = (d2 || []).map(r => ({
       user_id: r.user_id,
-      price: priceMap[r.product_id] || 0,
-    }));
-  } else {
-    drinkRows = (drinkRows || []).map(r => ({
-      user_id: r.user_id,
-      price: (r.products && typeof r.products.price === 'number')
-        ? Number(r.products.price) || 0
-        : 0,
+      price: priceMap[r.product_id] ?? 0,
     }));
   }
 
+  // Reduce totals / counts
   const totals = new Map();
   const counts = new Map();
   for (const row of (drinkRows || [])) {
     const u = row.user_id;
-    const p = Number(row.price) || 0;
+    const p = toNumber(row.price);
     totals.set(u, (totals.get(u) || 0) + p);
     counts.set(u, (counts.get(u) || 0) + 1);
   }
 
+  // Betalingen → som van absolute bedragen (betaling is reeds betaald)
   const { data: pays, error: pErr } = await supabase
     .from('payments')
     .select('user_id, amount');
   if (pErr) throw pErr;
 
   const paid = new Map();
-  (pays || []).forEach(p => {
-    const amt = Number(p.amount) || 0;
+  for (const p of (pays || [])) {
+    const amt = Math.abs(toNumber(p?.amount));
     paid.set(p.user_id, (paid.get(p.user_id) || 0) + amt);
-  });
+  }
 
+  // Combineer
   const rowsOut = (users || []).map(u => {
-    const total   = totals.get(u.id) || 0;
-    const count   = counts.get(u.id) || 0;
-    const paidAmt = paid.get(u.id)   || 0;
+    const total   = totals.get(u.id) ?? 0;
+    const count   = counts.get(u.id) ?? 0;
+    const paidAmt = paid.get(u.id)   ?? 0;
     const balance = total - paidAmt;
     return {
       id: u.id,
@@ -82,6 +78,7 @@ export async function fetchUserMetrics(supabase) {
     };
   });
 
+  // Sortering
   rowsOut.sort((a,b) =>
     (a.WIcreations !== b.WIcreations)
       ? (a.WIcreations ? -1 : 1)
@@ -92,13 +89,13 @@ export async function fetchUserMetrics(supabase) {
 }
 
 export async function fetchUserBalances(supabase){
-  // Robuust: altijd via metrics; voorkomt 400’s op users.balance
+  // Altijd via metrics (die snapshot-prijs prefereert); index toont nooit < 0
   const metrics = await fetchUserMetrics(supabase);
   const rows = (metrics || []).map(m => ({
     id: m.id,
     name: m.name,
     WIcreations: !!m.WIcreations,
-    balance: Math.max(0, Number(m.balance || 0)),
+    balance: Math.max(0, toNumber(m.balance)),
   }));
   rows.sort((a,b) =>
     (a.WIcreations !== b.WIcreations)
@@ -137,3 +134,6 @@ export async function fetchUserDrinkPivot(supabase){
 
   return { products, rows: out };
 }
+
+// helper
+function toNumber(x){ const n = Number(x); return Number.isFinite(n) ? n : 0; }
