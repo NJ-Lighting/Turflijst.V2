@@ -12,21 +12,22 @@ export async function fetchUserMetrics(supabase) {
     .order('name', { ascending: true });
   if (uErr) throw uErr;
 
-  // Drankjes met voorkeur voor snapshot prijs
-  let drinkRows = [];
-  const shot = await supabase.from('drinks').select('user_id, price');
-  if (!shot.error && Array.isArray(shot.data)) {
-    drinkRows = shot.data.map(r => ({ user_id: r.user_id, price: toNumber(r?.price) }));
-  } else {
-    const [{ data: d2, error: e1 }, { data: prods, error: e2 }] = await Promise.all([
-      supabase.from('drinks').select('user_id, product_id'),
-      supabase.from('products').select('id, price'),
-    ]);
-    if (e1) throw e1;
-    if (e2) throw e2;
-    const priceMap = Object.fromEntries((prods || []).map(p => [p.id, toNumber(p.price)]));
-    drinkRows = (d2 || []).map(r => ({ user_id: r.user_id, price: priceMap[r.product_id] ?? 0 }));
-  }
+  // Drankjes via join naar products(price) – voorkomt 400 op drinks.price
+  const [
+    { data: d2, error: e1 },
+    { data: prods, error: e2 },
+  ] = await Promise.all([
+    supabase.from('drinks').select('user_id, product_id'),
+    supabase.from('products').select('id, price'),
+  ]);
+  if (e1) throw e1;
+  if (e2) throw e2;
+
+  const priceMap = Object.fromEntries((prods || []).map(p => [p.id, toNumber(p.price)]));
+  const drinkRows = (d2 || []).map(r => ({
+    user_id: r.user_id,
+    price: priceMap[r.product_id] ?? 0,
+  }));
 
   // Totals / counts
   const totals = new Map();
@@ -38,7 +39,7 @@ export async function fetchUserMetrics(supabase) {
     counts.set(u, (counts.get(u) || 0) + 1);
   }
 
-  // Betalingen → detecteer teken-conventie per user
+  // Betalingen → teken-detectie per user
   const { data: pays, error: pErr } = await supabase
     .from('payments')
     .select('user_id, amount');
@@ -55,7 +56,7 @@ export async function fetchUserMetrics(supabase) {
     const total    = totals.get(u.id)  ?? 0;
     const count    = counts.get(u.id)  ?? 0;
     const paidSumU = paidSum.get(u.id) ?? 0;
-    // Som negatief → payments als negatieve credits opgeslagen
+    // Som negatief → betalingen als negatieve credits opgeslagen
     const balance  = paidSumU < 0 ? (total + paidSumU) : (total - paidSumU);
     return {
       id: u.id,
@@ -63,7 +64,7 @@ export async function fetchUserMetrics(supabase) {
       WIcreations: !!u.WIcreations,
       total,
       count,
-      paid: Math.abs(paidSumU), // gerapporteerde som "betaald"
+      paid: Math.abs(paidSumU), // rapportage: positief
       balance,
     };
   });
@@ -79,13 +80,12 @@ export async function fetchUserMetrics(supabase) {
 }
 
 export async function fetchUserBalances(supabase){
-  // Altijd via metrics (snapshot-prijs + teken-detectie payments)
+  // Index baseert op metrics; nooit negatief tonen (presentatie)
   const metrics = await fetchUserMetrics(supabase);
   const rows = (metrics || []).map(m => ({
     id: m.id,
     name: m.name,
     WIcreations: !!m.WIcreations,
-    // Index toont nooit < 0 (presentatie)
     balance: Math.max(0, toNumber(m.balance)),
   }));
   rows.sort((a,b) =>
