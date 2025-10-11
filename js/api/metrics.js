@@ -1,8 +1,9 @@
 // /js/api/metrics.js
 // Centrale metriek-functies voor alle pagina's.
 //
-// fetchUserMetrics: per gebruiker total, count, paid, balance, WIcreations
-// fetchUserDrinkPivot: volledige pivot-tabel (productenlijst + rijen met counts)
+// fetchUserMetrics     → voor Finance/overzichten (all-time drinks/payments)
+// fetchUserBalances    → voor Index (toont users.balance, nooit negatief)
+// fetchUserDrinkPivot  → pivot (users × producten) voor Index
 
 export async function fetchUserMetrics(supabase) {
   const { data: users, error: uErr } = await supabase
@@ -11,7 +12,6 @@ export async function fetchUserMetrics(supabase) {
     .order('name', { ascending: true });
   if (uErr) throw uErr;
 
-  // Drinks + price (join) met fallback
   let drinkRows = [];
   let joinError = null;
   try {
@@ -34,64 +34,87 @@ export async function fetchUserMetrics(supabase) {
     if (e2) throw e2;
 
     const priceMap = Object.fromEntries(
-      (prods || []).map(p => [p.id, toNumber(p.price)])
+      (prods || []).map(p => [p.id, Number(p.price) || 0])
     );
-
     drinkRows = (d2 || []).map(r => ({
       user_id: r.user_id,
-      price: priceMap[r.product_id] ?? 0,
+      price: priceMap[r.product_id] || 0,
     }));
   } else {
     drinkRows = (drinkRows || []).map(r => ({
       user_id: r.user_id,
-      price: toNumber(r?.products?.price),
+      price: (r.products && typeof r.products.price === 'number')
+        ? Number(r.products.price) || 0
+        : 0,
     }));
   }
 
-  // Reduce → totals / counts per user_id
   const totals = new Map();
   const counts = new Map();
   for (const row of (drinkRows || [])) {
     const u = row.user_id;
-    const p = toNumber(row.price);
+    const p = Number(row.price) || 0;
     totals.set(u, (totals.get(u) || 0) + p);
     counts.set(u, (counts.get(u) || 0) + 1);
   }
 
-  // Betalingen (zachte fallback bij RLS)
-  let pays = [];
-  try {
-    const res = await supabase.from('payments').select('user_id, amount');
-    if (res.error) throw res.error;
-    pays = res.data || [];
-  } catch { pays = []; }
+  const { data: pays, error: pErr } = await supabase
+    .from('payments')
+    .select('user_id, amount');
+  if (pErr) throw pErr;
+
   const paid = new Map();
-  for (const p of pays) {
-    const amt = toNumber(p?.amount);
+  (pays || []).forEach(p => {
+    const amt = Number(p.amount) || 0;
     paid.set(p.user_id, (paid.get(p.user_id) || 0) + amt);
-  }
+  });
 
-  // Combineer
-  const rowsOut = (users || []).map(u => ({
-    id: u.id,
-    name: u.name,
-    WIcreations: !!u.WIcreations,
-    total:   totals.get(u.id) ?? 0,
-    count:   counts.get(u.id) ?? 0,
-    paid:    paid.get(u.id)   ?? 0,
-    balance: (totals.get(u.id) ?? 0) - (paid.get(u.id) ?? 0),
-  }));
+  const rowsOut = (users || []).map(u => {
+    const total   = totals.get(u.id) || 0;
+    const count   = counts.get(u.id) || 0;
+    const paidAmt = paid.get(u.id)   || 0;
+    const balance = total - paidAmt;
+    return {
+      id: u.id,
+      name: u.name,
+      WIcreations: !!u.WIcreations,
+      total, count, paid: paidAmt, balance,
+    };
+  });
 
-  // Sortering
-  rowsOut.sort((a,b) => (a.WIcreations !== b.WIcreations)
-    ? (a.WIcreations ? -1 : 1)
-    : a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' }));
+  rowsOut.sort((a,b) =>
+    (a.WIcreations !== b.WIcreations)
+      ? (a.WIcreations ? -1 : 1)
+      : a.name.localeCompare(b.name, 'nl', { sensitivity:'base' })
+  );
 
   return rowsOut;
 }
 
-// Pivot: producten (kolommen) + rows = [{user, counts:[…]}]
-export async function fetchUserDrinkPivot(supabase) {
+export async function fetchUserBalances(supabase){
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, name, "WIcreations", balance')
+    .order('name', { ascending: true });
+  if (error) throw error;
+
+  const rows = (data || []).map(u => ({
+    id: u.id,
+    name: u.name,
+    WIcreations: !!u.WIcreations,
+    balance: Math.max(0, Number(u.balance || 0)),
+  }));
+
+  rows.sort((a,b) =>
+    (a.WIcreations !== b.WIcreations)
+      ? (a.WIcreations ? -1 : 1)
+      : a.name.localeCompare(b.name, 'nl', { sensitivity:'base' })
+  );
+
+  return rows;
+}
+
+export async function fetchUserDrinkPivot(supabase){
   const { data: rows, error } = await supabase
     .from('drinks')
     .select('user_id, users(name), products(name)');
@@ -109,16 +132,14 @@ export async function fetchUserDrinkPivot(supabase) {
     m.set(prod, (m.get(prod) || 0) + 1);
   }
 
-  const coll = new Intl.Collator('nl', { sensitivity: 'base', numeric: true });
+  const coll = new Intl.Collator('nl', { sensitivity:'base', numeric:true });
   const products = Array.from(productSet).sort(coll.compare);
   const users    = Array.from(usersMap.keys()).sort(coll.compare);
 
-  const outRows = users.map(u => ({
+  const out = users.map(u => ({
     user: u,
     counts: products.map(p => usersMap.get(u).get(p) || 0),
   }));
 
-  return { products, rows: outRows };
+  return { products, rows: out };
 }
-
-function toNumber(x){ const n = Number(x); return Number.isFinite(n) ? n : 0; }
