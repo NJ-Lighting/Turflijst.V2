@@ -13,15 +13,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   await renderPivotFromMetrics();
 });
 
-// Anti-spam flags
+// Anti-spam flags + (robuuste) UI-disable
 let isLogging = false;
 let isUndoing = false;
 
 function setUiBusy(busy) {
-  // Disable alle productknoppen en de undo-knop tijdens requests
   document.querySelectorAll('#product-buttons button.btn').forEach(b => b.disabled = busy);
-  const undoBtn = document.querySelector('button[onclick="undoLastDrink()"]');
+  const undoBtn = document.getElementById('undo-btn');
   if (undoBtn) undoBtn.disabled = busy;
+  const grid = document.getElementById('product-buttons');
+  if (grid) {
+    grid.style.pointerEvents = busy ? 'none' : '';
+    grid.setAttribute('aria-busy', busy ? 'true' : 'false');
+  }
 }
 
 async function loadUsers() {
@@ -138,12 +142,14 @@ window.logDrink = async (productId) => {
   // (4) User dropdown resetten
   const sel = $('#user'); if (sel) sel.value = '';
 
-  toast('✅ Drankje toegevoegd');
-  await renderTotalsFromMetrics();
-  await renderPivotFromMetrics();
-
-  setUiBusy(false);
-  isLogging = false;
+  try {
+    toast('✅ Drankje toegevoegd');
+    await renderTotalsFromMetrics();
+    await renderPivotFromMetrics();
+  } finally {
+    setUiBusy(false);
+    isLogging = false;
+  }
 };
 
 window.undoLastDrink = async () => {
@@ -191,12 +197,14 @@ window.undoLastDrink = async () => {
   // Products herladen na undo
   await loadProducts();
 
-  toast('⏪ Laatste drankje verwijderd');
-  await renderTotalsFromMetrics();
-  await renderPivotFromMetrics();
-
-  setUiBusy(false);
-  isUndoing = false;
+  try {
+    toast('⏪ Laatste drankje verwijderd');
+    await renderTotalsFromMetrics();
+    await renderPivotFromMetrics();
+  } finally {
+    setUiBusy(false);
+    isUndoing = false;
+  }
 };
 
 async function renderTotalsFromMetrics(){
