@@ -1,8 +1,8 @@
 // /js/api/metrics.js
 // Centrale metriek-functies voor alle pagina's.
 //
-// fetchUserMetrics     → voor Finance/overzichten (all-time drinks/payments)
-// fetchUserBalances    → voor Index (via metrics; nooit negatief tonen)
+// fetchUserMetrics     → Finance/overzichten (all-time drinks/payments)
+// fetchUserBalances    → Index (via metrics; nooit negatief tonen)
 // fetchUserDrinkPivot  → pivot (users × producten) voor Index
 
 export async function fetchUserMetrics(supabase) {
@@ -12,37 +12,23 @@ export async function fetchUserMetrics(supabase) {
     .order('name', { ascending: true });
   if (uErr) throw uErr;
 
-  // 2) Drankjes met voorkeur voor 'snapshot' prijs (drinks.price)
+  // Drankjes met voorkeur voor snapshot prijs
   let drinkRows = [];
-  let haveSnapshot = false;
-
-  const shot = await supabase
-    .from('drinks')
-    .select('user_id, price');
+  const shot = await supabase.from('drinks').select('user_id, price');
   if (!shot.error && Array.isArray(shot.data)) {
-    haveSnapshot = true;
     drinkRows = shot.data.map(r => ({ user_id: r.user_id, price: toNumber(r?.price) }));
   } else {
-    const [
-      { data: d2, error: e1 },
-      { data: prods, error: e2 },
-    ] = await Promise.all([
+    const [{ data: d2, error: e1 }, { data: prods, error: e2 }] = await Promise.all([
       supabase.from('drinks').select('user_id, product_id'),
       supabase.from('products').select('id, price'),
     ]);
     if (e1) throw e1;
     if (e2) throw e2;
-
-    const priceMap = Object.fromEntries(
-      (prods || []).map(p => [p.id, toNumber(p.price)])
-    );
-    drinkRows = (d2 || []).map(r => ({
-      user_id: r.user_id,
-      price: priceMap[r.product_id] ?? 0,
-    }));
+    const priceMap = Object.fromEntries((prods || []).map(p => [p.id, toNumber(p.price)]));
+    drinkRows = (d2 || []).map(r => ({ user_id: r.user_id, price: priceMap[r.product_id] ?? 0 }));
   }
 
-  // Reduce totals / counts
+  // Totals / counts
   const totals = new Map();
   const counts = new Map();
   for (const row of (drinkRows || [])) {
@@ -52,29 +38,33 @@ export async function fetchUserMetrics(supabase) {
     counts.set(u, (counts.get(u) || 0) + 1);
   }
 
-  // Betalingen → som van absolute bedragen (betaling is reeds betaald)
+  // Betalingen → detecteer teken-conventie per user
   const { data: pays, error: pErr } = await supabase
     .from('payments')
     .select('user_id, amount');
   if (pErr) throw pErr;
 
-  const paid = new Map();
+  const paidSum = new Map();
   for (const p of (pays || [])) {
-    const amt = Math.abs(toNumber(p?.amount));
-    paid.set(p.user_id, (paid.get(p.user_id) || 0) + amt);
+    const amt = toNumber(p?.amount);
+    paidSum.set(p.user_id, (paidSum.get(p.user_id) || 0) + amt);
   }
 
   // Combineer
   const rowsOut = (users || []).map(u => {
-    const total   = totals.get(u.id) ?? 0;
-    const count   = counts.get(u.id) ?? 0;
-    const paidAmt = paid.get(u.id)   ?? 0;
-    const balance = total - paidAmt;
+    const total    = totals.get(u.id)  ?? 0;
+    const count    = counts.get(u.id)  ?? 0;
+    const paidSumU = paidSum.get(u.id) ?? 0;
+    // Som negatief → payments als negatieve credits opgeslagen
+    const balance  = paidSumU < 0 ? (total + paidSumU) : (total - paidSumU);
     return {
       id: u.id,
       name: u.name,
       WIcreations: !!u.WIcreations,
-      total, count, paid: paidAmt, balance,
+      total,
+      count,
+      paid: Math.abs(paidSumU), // gerapporteerde som "betaald"
+      balance,
     };
   });
 
@@ -89,12 +79,13 @@ export async function fetchUserMetrics(supabase) {
 }
 
 export async function fetchUserBalances(supabase){
-  // Altijd via metrics (die snapshot-prijs prefereert); index toont nooit < 0
+  // Altijd via metrics (snapshot-prijs + teken-detectie payments)
   const metrics = await fetchUserMetrics(supabase);
   const rows = (metrics || []).map(m => ({
     id: m.id,
     name: m.name,
     WIcreations: !!m.WIcreations,
+    // Index toont nooit < 0 (presentatie)
     balance: Math.max(0, toNumber(m.balance)),
   }));
   rows.sort((a,b) =>
