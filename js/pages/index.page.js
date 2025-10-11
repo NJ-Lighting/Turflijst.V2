@@ -16,31 +16,31 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function loadUsers() {
   const { data: users, error } = await supabase
     .from('users')
-    .select('id, name')
-    .order('name', { ascending: true });
+    .select('id, name, "WIcreations"');
   if (error) return console.error(error);
 
   const sel = $('#user');
   if (!sel) return;
 
-  sel.innerHTML = '';
-  const ph = document.createElement('option');
-  ph.value = '';
-  ph.textContent = '-- Kies gebruiker --';
-  sel.appendChild(ph);
-
-  (users || []).forEach(u => {
-    const opt = document.createElement('option');
-    opt.value = u.id;
-    opt.textContent = u.name;
-    sel.appendChild(opt);
+  const coll = new Intl.Collator('nl', { sensitivity:'base' });
+  const sorted = (users || []).slice().sort((a,b) => {
+    if (!!a.WIcreations !== !!b.WIcreations) return a.WIcreations ? -1 : 1;
+    return coll.compare(a.name, b.name);
   });
+
+  let html = `<option value="">-- Kies gebruiker --</option>`;
+  let seenSplit = false;
+  sorted.forEach(u => {
+    if (!u.WIcreations && !seenSplit) { html += `<option disabled>────────────</option>`; seenSplit = true; }
+    html += `<option value="${u.id}">${esc(u.name)}</option>`;
+  });
+  sel.innerHTML = html;
 }
 
 async function loadProducts() {
   const { data: products, error } = await supabase
     .from('products')
-    .select('id, name, price')
+    .select('id, name, price, image_url')
     .order('name', { ascending: true });
   if (error) return console.error(error);
 
@@ -49,13 +49,17 @@ async function loadProducts() {
 
   grid.classList.add('product-grid');
   grid.innerHTML = '';
+
+  const BUCKET_URL = 'https://stmpommlhkokcjkwivfc.supabase.co/storage/v1/object/public/product-images/';
+
   (products || []).forEach(p => {
     const wrap = document.createElement('div');
     const btn  = document.createElement('button');
     btn.className = 'btn drink-btn';
     btn.type = 'button';
-    btn.innerHTML = `<div>${esc(p.name)}</div><div>${euro(p.price)}</div>`;
-    btn.addEventListener('click', () => logDrink(p.id));
+    const imgTag = p.image_url ? `<img src="${BUCKET_URL + esc(p.image_url)}" alt="${esc(p.name)}">` : '';
+    btn.innerHTML = `${imgTag}<div><div>${esc(p.name)}</div><div>${euro(p.price)}</div></div>`;
+    btn.addEventListener('click', () => logDrink(p.id)); // UUID-proof
     wrap.appendChild(btn);
     grid.appendChild(wrap);
   });
@@ -103,8 +107,7 @@ window.undoLastDrink = async () => {
 async function renderTotalsFromMetrics(){
   try{
     $('#totalToPayList').innerHTML = `<tr><td colspan="2">Laden…</td></tr>`;
-    // V1-conform: som van alle drinks met HUIDIGE products(price), géén payments
-    const rows = await fetchUserTotalsCurrentPrice(supabase);
+    const rows = await fetchUserTotalsCurrentPrice(supabase); // V1-conform
     $('#totalToPayList').innerHTML =
       (rows || []).map(r => `<tr><td>${esc(r.name)}</td><td class="right">${euro(r.amount)}</td></tr>`).join('') ||
       `<tr><td colspan="2" style="opacity:.7">Nog geen data</td></tr>`;

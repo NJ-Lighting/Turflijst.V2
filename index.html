@@ -8,7 +8,6 @@
   <link rel="stylesheet" href="/css/nav.css" />
 </head>
 <body class="bg-train">
-  <!-- Hamburger navigatie -->
   <header class="site-nav" role="banner">
     <button class="nav-toggle" aria-controls="nav-drawer" aria-expanded="false" aria-label="Menu openen">☰</button>
     <nav id="nav-drawer" class="nav-drawer" role="navigation" aria-label="Hoofdnavigatie">
@@ -30,12 +29,9 @@
       <select id="user" class="select"></select>
     </div>
 
-    <div class="flex">
-      <h2>Beschikbare Drankjes</h2>
-      <button class="btn" onclick="undoLastDrink()">⏪ Undo laatste drankje</button>
-    </div>
-
-    <div id="product-buttons" class="grid"></div>
+    <h2>Beschikbare Drankjes</h2>
+    <div id="product-buttons" class="product-grid"></div>
+    <button class="btn btn-warn block" onclick="undoLastDrink()">⏪ Undo laatste drankje</button>
 
     <h3 class="section-title">Totaal te betalen</h3>
     <table class="table">
@@ -50,7 +46,6 @@
     </table>
   </div>
 
-  <!-- Modules -->
   <script type="module" src="/js/core.js"></script>
   <script type="module" src="/js/supabase.client.js"></script>
   <script type="module" src="/js/api/stock.js"></script>

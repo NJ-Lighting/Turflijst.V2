@@ -3,13 +3,10 @@
 html,body{ height:100% }
 body{ margin:0; font-family:Arial,sans-serif; color:var(--text); text-align:center; padding:20px; }
 
-/* Background */
 .bg-train{ background:url('/Train%20scene.webp') no-repeat center center fixed; background-size:cover; }
 
-/* Wrapper */
 .content-wrapper{ background:var(--panel); padding:20px; border-radius:10px; display:inline-block; width:min(95%, 1000px); }
 
-/* Buttons */
 .btn{ display:inline-block; padding:15px 20px; font-size:18px; margin:10px; cursor:pointer; border:none; border-radius:10px; background:var(--btn); color:#fff; transition:transform .2s, background .2s; }
 .btn:hover{ background:var(--green-d); transform:scale(1.07) }
 .btn.block{ display:block; width:min(90%, 250px); margin-inline:auto }
@@ -17,22 +14,20 @@ body{ margin:0; font-family:Arial,sans-serif; color:var(--text); text-align:cent
 .btn.btn-warn:hover{ background:var(--danger-d) }
 .btn.ghost{ background:#f0f0f0; color:#111 }
 
-/* Selects & Inputs */
 .select, select, input[type="number"], input[type="text"]{ font-size:18px; padding:12px; width:90%; margin:10px 0; border-radius:8px; background:#222; color:#fff; border:1px solid var(--green); text-align:center; }
 
-/* Tables */
 .table{ width:100%; border-collapse:collapse; margin-top:20px; background:#fff; color:#000; border-radius:10px; overflow:hidden; border:2px solid var(--border); }
 .table th, .table td{ border:2px solid var(--border); padding:10px; text-align:center; }
 .table th{ background:var(--green); color:#fff }
-/* Zorg dat right ook binnen tabel cellen wint van center */
 .table td.right, .table th.right{ text-align:right; }
 
-/* Product grid & buttons */
-.product-grid, .product-grid > div{
+.product-grid{
   display:grid;
   grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));
   gap:20px; width:100%; max-width:600px; margin-inline:auto;
 }
+.product-grid > div{ display:flex; justify-content:center; }
+
 .drink-btn{
   display:flex; align-items:center; justify-content:flex-start;
   padding:10px 15px; font-size:18px; border:none; border-radius:10px;
@@ -42,11 +37,5 @@ body{ margin:0; font-family:Arial,sans-serif; color:var(--text); text-align:cent
 .drink-btn:hover{ background:var(--green-d); transform:scale(1.07) }
 .drink-btn img{ height:40px; width:40px; object-fit:contain; margin-right:15px; border-radius:5px }
 
-/* Toast */
 .toast{ position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:var(--green); color:#fff; padding:12px 20px; border-radius:10px; font-size:18px; z-index:1000; transition:opacity .5s; }
-
-/* Headerbalk boven de producten netjes uitlijnen op alle breedtes */
-.flex{
-  display:flex; align-items:center; justify-content:space-between; gap:12px;
-  flex-wrap:wrap; max-width:1000px; margin-inline:auto;
-}
+.flex{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; max-width:1000px; margin-inline:auto; }
