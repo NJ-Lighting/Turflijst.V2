@@ -1,66 +1,110 @@
-// /js/pages/index.page.js
+// === Turf Lijst – Index Pagina ===
 import { $, $$, toast, euro, esc } from '../core.js';
 import { supabase } from '../supabase.client.js';
+
+const fmtEUR = (n) => Number(n || 0).toFixed(2).replace('.', ',');
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadUsers();
   await loadProducts();
-  $('#user')?.addEventListener('change', refreshTotals);
-  await refreshTotals();
+  $('#user')?.addEventListener('change', () => {
+    loadTotalToPay();
+    loadUserDrinkTotals();
+  });
+  await loadTotalToPay();
+  await loadUserDrinkTotals();
 });
 
+/* ---------- Users ---------- */
 async function loadUsers() {
   const { data: users, error } = await supabase
     .from('users')
     .select('id, name')
     .order('name', { ascending: true });
+
   if (error) return console.error(error);
 
-  $('#user').innerHTML = (users || [])
-    .map((u) => `<option value="${esc(u.id)}">${esc(u.name)}</option>`)
-    .join('');
+  const sel = $('#user');
+  if (!sel) return;
+
+  sel.innerHTML = '';
+  const ph = document.createElement('option');
+  ph.value = '';
+  ph.textContent = '-- Kies gebruiker --';
+  sel.appendChild(ph);
+
+  (users || []).forEach(u => {
+    const opt = document.createElement('option');
+    opt.value = u.id;
+    opt.textContent = u.name;
+    sel.appendChild(opt);
+  });
 }
 
+/* ---------- Products ---------- */
 async function loadProducts() {
   const { data: products, error } = await supabase
     .from('products')
-    .select('id, name, price')
+    .select('id, name, price, image_url')
     .order('name', { ascending: true });
+
   if (error) return console.error(error);
 
   const grid = $('#product-buttons');
-  grid.innerHTML = (products || [])
-    .map(
-      (p) => `
-      <button class="btn drink-btn" onclick="logDrink('${esc(p.id)}')">
-        <div style="text-align:left">${esc(p.name)} – ${euro(p.price)}</div>
-      </button>
-    `
-    )
-    .join('');
+  if (!grid) return;
+
+  grid.innerHTML = '';
+  grid.classList.add('product-grid');
+
+  (products || []).forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'btn drink-btn';
+    btn.type = 'button';
+    btn.addEventListener('click', () => logDrink(p.id));
+
+    const imgUrl = p.image_url
+      ? `https://stmpommlhkokcjkwivfc.supabase.co/storage/v1/object/public/product-images/${p.image_url}`
+      : '';
+
+    btn.innerHTML = `
+      ${imgUrl ? `<img src="${esc(imgUrl)}" alt="${esc(p.name)}" />` : ''}
+      <div>
+        <div>${esc(p.name)}</div>
+        <div>€${fmtEUR(p.price)}</div>
+      </div>
+    `;
+
+    const cell = document.createElement('div');
+    cell.appendChild(btn);
+    grid.appendChild(cell);
+  });
 }
 
-window.logDrink = async (productId) => {
-  const userId = $('#user').value;
+/* ---------- Drinks actions ---------- */
+async function logDrink(productId) {
+  const userId = $('#user')?.value;
   if (!userId) return toast('⚠️ Kies eerst een gebruiker');
 
-  // prijs ophalen (i.v.m. balance-update via RPC)
+  // prijs ophalen voor eventuele balance-flows (compatibel met oude RPC)
   const { data: product } = await supabase
     .from('products')
     .select('price')
     .eq('id', productId)
     .single();
+
   const price = product?.price || 0;
 
   await supabase.from('drinks').insert([{ user_id: userId, product_id: productId }]);
-  await supabase.rpc('update_user_balance', { user_id: userId, amount: price });
+
+  // Optioneel (indien je RPC gebruikt): await supabase.rpc('update_user_balance', { user_id: userId, amount: price });
 
   toast('✅ Drankje toegevoegd');
-  await refreshTotals();
-};
+  await loadTotalToPay();
+  await loadUserDrinkTotals();
+}
 
-window.undoLastDrink = async () => {
-  const userId = $('#user').value;
+async function undoLastDrink() {
+  const userId = $('#user')?.value;
   if (!userId) return toast('⚠️ Kies eerst een gebruiker');
 
   const { data, error } = await supabase
@@ -70,53 +114,65 @@ window.undoLastDrink = async () => {
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
+
   if (error || !data) return toast('❌ Geen drankje om te verwijderen');
 
   await supabase.from('drinks').delete().eq('id', data.id);
 
-  const { data: prod } = await supabase
-    .from('products')
-    .select('price')
-    .eq('id', data.product_id)
-    .single();
-  const price = prod?.price || 0;
-
-  await supabase.rpc('update_user_balance', { user_id: userId, amount: -price });
+  // Optioneel (indien je RPC gebruikt):
+  // const { data: prod } = await supabase.from('products').select('price').eq('id', data.product_id).single();
+  // const price = prod?.price || 0;
+  // await supabase.rpc('update_user_balance', { user_id: userId, amount: -price });
 
   toast('⏪ Laatste drankje verwijderd');
-  await refreshTotals();
-};
+  await loadTotalToPay();
+  await loadUserDrinkTotals();
+}
 
-async function refreshTotals() {
-  // Totaal te betalen (gebruikt users.balance)
-  const { data: users } = await supabase
+// maak beschikbaar voor inline onclick in HTML
+Object.assign(window, { logDrink, undoLastDrink });
+
+/* ---------- Totals (tabel) ---------- */
+async function loadTotalToPay() {
+  // Als je users.balance gebruikt:
+  const { data: users, error } = await supabase
     .from('users')
     .select('id, name, balance')
     .order('name', { ascending: true });
 
-  $('#totalToPayList').innerHTML = (users || [])
-    .map(
-      (u) => `<tr><td>${esc(u.name)}</td><td class="right">${euro(u.balance || 0)}</td></tr>`
-    )
-    .join('');
+  if (error) return console.error(error);
 
-  // Drankjes per gebruiker (pivot: 1 kolom per drankje)
-  await renderUserDrinkPivot();
+  $('#totalToPayList').innerHTML =
+    (users || [])
+      .map(u => `
+        <tr>
+          <td>${esc(u.name)}</td>
+          <td class="right">€${fmtEUR(u.balance || 0)}</td>
+        </tr>
+      `)
+      .join('') || `<tr><td colspan="2" style="opacity:.7">Nog geen data</td></tr>`;
 }
 
-async function renderUserDrinkPivot() {
+/* ---------- Pivot: Drankjes per gebruiker ---------- */
+async function loadUserDrinkTotals() {
   const { data: rows, error } = await supabase
     .from('drinks')
     .select('user_id, users(name), products(name)');
+
+  const headEl = document.getElementById('userDrinkTotalsHead');
+  const bodyEl = document.getElementById('userDrinkTotalsBody');
+  if (!headEl || !bodyEl) return;
+
   if (error) {
-    console.error('renderUserDrinkPivot:', error);
-    $('#userDrinkTotalsTable').innerHTML =
-      `<tr><td class="muted">Kon gegevens niet laden</td></tr>`;
+    console.error('loadUserDrinkTotals:', error);
+    headEl.innerHTML = '';
+    bodyEl.innerHTML = `<tr><td>Kon gegevens niet laden</td></tr>`;
     return;
   }
 
-  const usersMap = new Map();   // userName -> Map(productName -> count)
-  const productSet = new Set(); // unieke productnamen
+  const usersMap = new Map(); // userName -> Map(productName -> count)
+  const productSet = new Set();
+
   for (const r of (rows || [])) {
     const user = r?.users?.name || 'Onbekend';
     const prod = r?.products?.name || 'Onbekend';
@@ -128,21 +184,23 @@ async function renderUserDrinkPivot() {
 
   const coll = new Intl.Collator('nl', { sensitivity: 'base', numeric: true });
   const products = Array.from(productSet).sort(coll.compare);
-  const users = Array.from(usersMap.keys()).sort(coll.compare);
+  const users    = Array.from(usersMap.keys()).sort(coll.compare);
 
-  const headerRow =
-    `<tr><th>Gebruiker</th>${products.map(p => `<th class="right">${esc(p)}</th>`).join('')}</tr>`;
+  headEl.innerHTML = `
+    <tr>
+      <th>Gebruiker</th>
+      ${products.map(p => `<th class="right">${esc(p)}</th>`).join('')}
+    </tr>
+  `;
 
-  const bodyRows = users.length
+  bodyEl.innerHTML = users.length
     ? users.map(u => {
         const m = usersMap.get(u);
-        const tds = products
-          .map(p => `<td class="right">${m.get(p) || 0}</td>`)
-          .join('');
+        const tds = products.map(p => `<td class="right">${m.get(p) || 0}</td>`).join('');
         return `<tr><td>${esc(u)}</td>${tds}</tr>`;
       }).join('')
-    : `<tr><td colspan="${1 + products.length}" class="muted">Nog geen data</td></tr>`;
-
-  // Legacy: we injecteren header + body in dezelfde tbody (#userDrinkTotalsTable)
-  $('#userDrinkTotalsTable').innerHTML = headerRow + bodyRows;
+    : `<tr><td colspan="${1 + products.length}" style="opacity:.7">Nog geen data</td></tr>`;
 }
+
+// (optioneel) export voor tests
+export { loadUsers, loadProducts, loadTotalToPay, loadUserDrinkTotals };

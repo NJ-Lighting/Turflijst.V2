@@ -6,33 +6,27 @@
 }
 *{ box-sizing:border-box }
 html,body{ height:100% }
-body{
-  margin:0; font-family:Arial,sans-serif; color:var(--text);
-  text-align:center; padding:20px;
-}
+body{ margin:0; font-family:Arial,sans-serif; color:var(--text); text-align:center; padding:20px; }
 
-/* --- Achtergrond Train Scene --- */
-.bg-train {
-  /* Achtergrondafbeelding Turflijst */
-  background: url('/Train scene.webp'), url('/assets/Train scene.webp');
-  background-position: center center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-  min-height: 100vh;
+/* Background */
+.bg-train{
+  background:url('/Train%20scene.webp') no-repeat center center fixed;
+  background-size:cover;
 }
-
 
 /* Wrapper */
 .content-wrapper{
-  background:var(--panel); padding:20px; border-radius:10px;
-  display:inline-block; width:min(95%, 1000px);
+  background:var(--panel);
+  padding:20px; border-radius:10px;
+  display:inline-block;
+  width:min(95%, 1000px);
 }
 
 /* Buttons */
 .btn{
   display:inline-block; padding:15px 20px; font-size:18px; margin:10px;
-  cursor:pointer; border:none; border-radius:10px; background:var(--btn); color:#fff;
+  cursor:pointer; border:none; border-radius:10px;
+  background:var(--btn); color:#fff;
   transition:transform .2s, background .2s;
 }
 .btn:hover{ background:var(--green-d); transform:scale(1.07) }
@@ -58,8 +52,7 @@ body{
 .table th{ background:var(--green); color:#fff }
 
 /* Product grid & buttons */
-.product-grid,
-.product-grid > div{
+.product-grid, .product-grid > div{
   display:grid;
   grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));
   gap:20px; width:100%; max-width:600px; margin-inline:auto;
@@ -79,3 +72,7 @@ body{
   background:var(--green); color:#fff; padding:12px 20px; border-radius:10px;
   font-size:18px; z-index:1000; transition:opacity .5s;
 }
+
+/* Helpers voor uitlijning die je al in de HTML gebruikt */
+.flex{ display:flex; align-items:center; justify-content:space-between; gap:12px; max-width:1000px; margin-inline:auto; }
+.right{ text-align:right; }
