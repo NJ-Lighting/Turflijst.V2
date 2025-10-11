@@ -13,6 +13,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   await renderPivotFromMetrics();
 });
 
+// Anti-spam flags
+let isLogging = false;
+let isUndoing = false;
+
+function setUiBusy(busy) {
+  // Disable alle productknoppen en de undo-knop tijdens requests
+  document.querySelectorAll('#product-buttons button.btn').forEach(b => b.disabled = busy);
+  const undoBtn = document.querySelector('button[onclick="undoLastDrink()"]');
+  if (undoBtn) undoBtn.disabled = busy;
+}
+
 async function loadUsers() {
   const { data: users, error } = await supabase
     .from('users')
@@ -72,15 +83,23 @@ async function loadProducts() {
     btn.type = 'button';
     const imgTag = p.image_url ? `<img src="${BUCKET_URL + esc(p.image_url)}" alt="${esc(p.name)}">` : '';
     btn.innerHTML = `${imgTag}<div><div>${esc(p.name)}</div><div>${euro(p.price)}</div></div>`;
-    btn.addEventListener('click', () => logDrink(p.id));
+    btn.addEventListener('click', () => logDrink(p.id)); // UUID-proof
     wrap.appendChild(btn);
     grid.appendChild(wrap);
   });
 }
 
 window.logDrink = async (productId) => {
+  if (isLogging) return; // debounce double-clicks
+  isLogging = true;
+  setUiBusy(true);
+
   const userId = $('#user').value;
-  if (!userId) return toast('⚠️ Kies eerst een gebruiker');
+  if (!userId) {
+    setUiBusy(false);
+    isLogging = false;
+    return toast('⚠️ Kies eerst een gebruiker');
+  }
 
   const { data: product } = await supabase.from('products').select('price').eq('id', productId).single();
   const price = product?.price || 0;
@@ -122,9 +141,16 @@ window.logDrink = async (productId) => {
   toast('✅ Drankje toegevoegd');
   await renderTotalsFromMetrics();
   await renderPivotFromMetrics();
+
+  setUiBusy(false);
+  isLogging = false;
 };
 
 window.undoLastDrink = async () => {
+  if (isUndoing) return; // voorkom undo-spam
+  isUndoing = true;
+  setUiBusy(true);
+
   // (5) Globaal laatste drankje
   const { data: last, error } = await supabase
     .from('drinks')
@@ -132,7 +158,12 @@ window.undoLastDrink = async () => {
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
-  if (error || !last) return toast('❌ Geen drankje om te verwijderen');
+  if (error || !last) {
+    toast('❌ Geen drankje om te verwijderen');
+    setUiBusy(false);
+    isUndoing = false;
+    return;
+  }
 
   await supabase.from('drinks').delete().eq('id', last.id);
 
@@ -163,6 +194,9 @@ window.undoLastDrink = async () => {
   toast('⏪ Laatste drankje verwijderd');
   await renderTotalsFromMetrics();
   await renderPivotFromMetrics();
+
+  setUiBusy(false);
+  isUndoing = false;
 };
 
 async function renderTotalsFromMetrics(){
