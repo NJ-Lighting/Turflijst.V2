@@ -86,7 +86,11 @@ window.logDrink = async (productId) => {
   const price = product?.price || 0;
 
   await supabase.from('drinks').insert([{ user_id: userId, product_id: productId }]);
-  await supabase.rpc('update_user_balance', { user_id: userId, amount: price }).catch(() => {});
+  try {
+    await supabase.rpc('update_user_balance', { user_id: userId, amount: price });
+  } catch {
+    console.warn('Kon balans niet updaten (niet kritisch).');
+  }
 
   // (1) FIFO voorraad verlagen
   const { data: fifo, error: bErr } = await supabase
@@ -140,7 +144,11 @@ window.undoLastDrink = async () => {
   // Balance corrigeren (met actuele productprijs)
   const { data: prod } = await supabase.from('products').select('price').eq('id', last.product_id).single();
   const price = prod?.price || 0;
-  await supabase.rpc('update_user_balance', { user_id: last.user_id, amount: -price }).catch(() => {});
+  try {
+    await supabase.rpc('update_user_balance', { user_id: last.user_id, amount: -price });
+  } catch {
+    console.warn('Kon balans niet updaten bij undo (niet kritisch).');
+  }
 
   // Voorraad terugboeken: +1 op meest recente batch of nieuwe batch maken
   const { data: recentBatch, error: rbErr } = await supabase
