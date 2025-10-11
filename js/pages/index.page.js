@@ -1,6 +1,6 @@
 import { $, $$, toast, euro, esc } from '../core.js';
 import { supabase } from '../supabase.client.js';
-import { fetchUserBalances, fetchUserDrinkPivot } from '../api/metrics.js';
+import { fetchUserDrinkPivot, fetchUserTotalsCurrentPrice } from '../api/metrics.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadUsers();
@@ -55,7 +55,7 @@ async function loadProducts() {
     btn.className = 'btn drink-btn';
     btn.type = 'button';
     btn.innerHTML = `<div>${esc(p.name)}</div><div>${euro(p.price)}</div>`;
-    btn.addEventListener('click', () => logDrink(p.id)); // UUID-proof
+    btn.addEventListener('click', () => logDrink(p.id));
     wrap.appendChild(btn);
     grid.appendChild(wrap);
   });
@@ -65,16 +65,11 @@ window.logDrink = async (productId) => {
   const userId = $('#user').value;
   if (!userId) return toast('⚠️ Kies eerst een gebruiker');
 
-  const { data: product } = await supabase
-    .from('products')
-    .select('price')
-    .eq('id', productId)
-    .single();
+  const { data: product } = await supabase.from('products').select('price').eq('id', productId).single();
   const price = product?.price || 0;
 
   await supabase.from('drinks').insert([{ user_id: userId, product_id: productId }]);
-  await supabase.rpc('update_user_balance', { user_id: userId, amount: price });
-
+  await supabase.rpc('update_user_balance', { user_id: userId, amount: price }).catch(() => {});
   toast('✅ Drankje toegevoegd');
   await renderTotalsFromMetrics();
   await renderPivotFromMetrics();
@@ -96,15 +91,10 @@ window.undoLastDrink = async () => {
 
   await supabase.from('drinks').delete().eq('id', data.id);
 
-  const { data: prod } = await supabase
-    .from('products')
-    .select('price')
-    .eq('id', data.product_id)
-    .single();
+  const { data: prod } = await supabase.from('products').select('price').eq('id', data.product_id).single();
   const price = prod?.price || 0;
 
-  await supabase.rpc('update_user_balance', { user_id: userId, amount: -price });
-
+  await supabase.rpc('update_user_balance', { user_id: userId, amount: -price }).catch(() => {});
   toast('⏪ Laatste drankje verwijderd');
   await renderTotalsFromMetrics();
   await renderPivotFromMetrics();
@@ -113,10 +103,11 @@ window.undoLastDrink = async () => {
 async function renderTotalsFromMetrics(){
   try{
     $('#totalToPayList').innerHTML = `<tr><td colspan="2">Laden…</td></tr>`;
-    const rows = await fetchUserBalances(supabase); // balance of fallback metrics; nooit negatief getoond
+    // V1-conform: som van alle drinks met HUIDIGE products(price), géén payments
+    const rows = await fetchUserTotalsCurrentPrice(supabase);
     $('#totalToPayList').innerHTML =
-      (rows || []).map(r => `<tr><td>${esc(r.name)}</td><td class="right">${euro(r.balance)}</td></tr>`).join('')
-      || `<tr><td colspan="2" style="opacity:.7">Nog geen data</td></tr>`;
+      (rows || []).map(r => `<tr><td>${esc(r.name)}</td><td class="right">${euro(r.amount)}</td></tr>`).join('') ||
+      `<tr><td colspan="2" style="opacity:.7">Nog geen data</td></tr>`;
   }catch(e){
     console.error('renderTotalsFromMetrics:', e);
     $('#totalToPayList').innerHTML = `<tr><td colspan="2">Kon bedragen niet laden</td></tr>`;
@@ -129,8 +120,8 @@ async function renderPivotFromMetrics(){
     $('#userDrinkTotalsHead').innerHTML =
       `<tr><th>Gebruiker</th>${products.map(p => `<th class="right">${esc(p)}</th>`).join('')}</tr>`;
     $('#userDrinkTotalsBody').innerHTML =
-      (rows || []).map(r => `<tr><td>${esc(r.user)}</td>${r.counts.map(c => `<td class="right">${c}</td>`).join('')}</tr>`).join('')
-      || `<tr><td colspan="${1 + products.length}" style="opacity:.7">Nog geen data</td></tr>`;
+      (rows || []).map(r => `<tr><td>${esc(r.user)}</td>${r.counts.map(c => `<td class="right">${c}</td>`).join('')}</tr>`).join('') ||
+      `<tr><td colspan="${1 + products.length}" style="opacity:.7">Nog geen data</td></tr>`;
   } catch(e){
     console.error('renderPivotFromMetrics:', e);
     $('#userDrinkTotalsHead').innerHTML = '';
