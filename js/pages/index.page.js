@@ -48,14 +48,17 @@ async function loadProducts() {
   if (!grid) return;
 
   grid.classList.add('product-grid');
-  grid.innerHTML = (products || []).map(p => `
-    <div>
-      <button class="btn drink-btn" type="button" onclick="logDrink(${p.id})">
-        <div>${esc(p.name)}</div>
-        <div>${euro(p.price)}</div>
-      </button>
-    </div>
-  `).join('');
+  grid.innerHTML = '';
+  (products || []).forEach(p => {
+    const wrap = document.createElement('div');
+    const btn  = document.createElement('button');
+    btn.className = 'btn drink-btn';
+    btn.type = 'button';
+    btn.innerHTML = `<div>${esc(p.name)}</div><div>${euro(p.price)}</div>`;
+    btn.addEventListener('click', () => logDrink(p.id)); // UUID-proof
+    wrap.appendChild(btn);
+    grid.appendChild(wrap);
+  });
 }
 
 window.logDrink = async (productId) => {
@@ -110,10 +113,15 @@ window.undoLastDrink = async () => {
 };
 
 async function renderTotalsFromMetrics(){
-  const rows = await fetchUserBalances(supabase); // DB-balance, nooit negatief weergegeven
-  $('#totalToPayList').innerHTML =
-    (rows || []).map(r => `<tr><td>${esc(r.name)}</td><td class="right">${euro(r.balance)}</td></tr>`).join('')
-    || `<tr><td colspan="2" style="opacity:.7">Nog geen data</td></tr>`;
+  try{
+    const rows = await fetchUserBalances(supabase); // DB-balance, nooit negatief weergegeven
+    $('#totalToPayList').innerHTML =
+      (rows || []).map(r => `<tr><td>${esc(r.name)}</td><td class="right">${euro(r.balance)}</td></tr>`).join('')
+      || `<tr><td colspan="2" style="opacity:.7">Nog geen data</td></tr>`;
+  }catch(e){
+    console.error('renderTotalsFromMetrics:', e);
+    $('#totalToPayList').innerHTML = `<tr><td colspan="2">Kon bedragen niet laden</td></tr>`;
+  }
 }
 
 async function renderPivotFromMetrics(){
