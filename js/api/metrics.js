@@ -4,27 +4,26 @@
 /**
  * Volledige metriek per user:
  * - total: som van price_at_purchase (historische prijs) van alle ONBETAALDE drinks
- * - paid: som van alle payments.amount (positief=betaling, negatief=refund/correctie)
- * - balance: total - paid (positief = nog te betalen; kan negatief zijn bij teveel betaald)
+ * - paid: som van alle payments.amount
+ * - balance: total - paid
  * - count: aantal ONBETAALDE drinks
  */
 export async function fetchUserMetrics(supabase) {
-  // 1) Users
   const { data: users, error: uErr } = await supabase
     .from('users')
     .select('id, name, "WIcreations"')
     .order('name', { ascending: true });
   if (uErr) throw uErr;
 
-  // 2) Drankjes (alleen ONBETAALD: paid=false of NULL), historische prijs
+  // Alleen onbetaald (paid=false of NULL)
   const { data: drinks, error: dErr } = await supabase
     .from('drinks')
     .select('user_id, price_at_purchase, paid')
     .or('paid.is.null,paid.eq.false');
   if (dErr) throw dErr;
 
-  const totals = new Map(); // user_id -> som(prijs)
-  const counts = new Map(); // user_id -> aantal
+  const totals = new Map();
+  const counts = new Map();
   for (const r of (drinks || [])) {
     const uid = r.user_id;
     const price = toNumber(r?.price_at_purchase);
@@ -32,29 +31,23 @@ export async function fetchUserMetrics(supabase) {
     counts.set(uid, (counts.get(uid) || 0) + 1);
   }
 
-  // 3) Betalingen (positief = betaling, negatief = refund/correctie)
   const { data: pays, error: pErr } = await supabase
     .from('payments')
     .select('user_id, amount');
   if (pErr) throw pErr;
-  const paidSum = new Map(); // user_id -> som(amount)
+
+  const paidSum = new Map();
   for (const p of (pays || [])) {
     const a = toNumber(p?.amount);
     paidSum.set(p.user_id, (paidSum.get(p.user_id) || 0) + a);
   }
 
-  // 4) Output per user
   const rowsOut = (users || []).map(u => {
-    const total = totals.get(u.id) ?? 0;   // alleen onbetaalde consumpties
+    const total = totals.get(u.id) ?? 0;   // onbetaald
     const count = counts.get(u.id) ?? 0;
     const paid  = paidSum.get(u.id) ?? 0;  // som payments
-    const balance = total - paid;          // positief = nog te betalen
-    return {
-      id: u.id,
-      name: u.name,
-      WIcreations: !!u.WIcreations,
-      total, count, paid, balance
-    };
+    const balance = total - paid;
+    return { id: u.id, name: u.name, WIcreations: !!u.WIcreations, total, count, paid, balance };
   });
 
   rowsOut.sort((a, b) => {
@@ -65,10 +58,6 @@ export async function fetchUserMetrics(supabase) {
   return rowsOut;
 }
 
-/**
- * UI-geschikte balans: balance geclamped naar >= 0.
- * Gebruik dit voor overzichten waar je alleen 'te betalen' wilt tonen.
- */
 export async function fetchUserBalances(supabase) {
   const metrics = await fetchUserMetrics(supabase);
   const rows = (metrics || []).map(m => ({
@@ -84,7 +73,6 @@ export async function fetchUserBalances(supabase) {
   return rows;
 }
 
-/** Snelle helper: Map<user_id, balance>=0 voor directe lookup. */
 export async function fetchUserBalancesMap(supabase) {
   const rows = await fetchUserBalances(supabase);
   const map = new Map();
@@ -92,7 +80,6 @@ export async function fetchUserBalancesMap(supabase) {
   return map;
 }
 
-/** Pivottabel: gebruikers x producten met aantallen (alle consumpties). */
 export async function fetchUserDrinkPivot(supabase) {
   const { data: rows, error } = await supabase
     .from('drinks')
@@ -117,10 +104,7 @@ export async function fetchUserDrinkPivot(supabase) {
   return { products, rows: out };
 }
 
-/**
- * Totals per user op basis van price_at_purchase (historische prijs) — alleen ONBETAALD.
- * (Naam-gebaseerd; vooral voor grafieken/exports.)
- */
+// Totals op historische prijs — alleen onbetaald
 export async function fetchUserTotalsCurrentPrice(supabase) {
   const { data, error } = await supabase
     .from('drinks')

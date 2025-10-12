@@ -9,9 +9,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#btn-add-product')?.addEventListener('click', addProduct);
 });
 
-/* ---------------------------
- * Gebruikersbeheer
- * --------------------------- */
 async function loadUsers() {
   try {
     const { data: users, error: uErr } = await supabase
@@ -20,13 +17,14 @@ async function loadUsers() {
       .order('name', { ascending: true });
     if (uErr) { console.error('users load error:', uErr); return toast('❌ Kan gebruikers niet laden'); }
 
-    // "Te betalen" via metrics (openstaand, historische prijs). Fallback: directe som van price_at_purchase.
+    // Primair via metrics (total = som onbetaald met historische prijs)
     const balances = new Map();
     try {
-      const metrics = await fetchUserMetrics(supabase); // [{id, total, paid, balance, ...}]
+      const metrics = await fetchUserMetrics(supabase); // [{id, total, ...}]
       for (const m of (metrics || [])) balances.set(m.id, Number(m.total || 0));
     } catch {}
 
+    // Fallback: directe som price_at_purchase van onbetaald (paid=false/NULL)
     if (!balances.size) {
       const { data: drinks } = await supabase
         .from('drinks')
@@ -34,11 +32,11 @@ async function loadUsers() {
         .or('paid.is.null,paid.eq.false');
       const tmp = {};
       for (const d of (drinks || [])) {
-        const uid = d.user_id;
+        const uid = d.user_id; // UUID string
         const price = Number(d?.price_at_purchase) || 0;
         tmp[uid] = (tmp[uid] || 0) + price;
       }
-      for (const uid of Object.keys(tmp)) balances.set(Number(uid), tmp[uid]);
+      for (const uid of Object.keys(tmp)) balances.set(uid, tmp[uid]);
     }
 
     const rows = (users || []).map(u => {
@@ -59,8 +57,8 @@ async function loadUsers() {
       `;
     }).join('');
 
-    if ($('#tbl-users')) $('#tbl-users').innerHTML = rows;   // v2
-    if ($('#userTable')) $('#userTable').innerHTML = rows;   // v1
+    if ($('#tbl-users')) $('#tbl-users').innerHTML = rows;
+    if ($('#userTable')) $('#userTable').innerHTML = rows;
   } catch (err) {
     console.error('loadUsers error:', err);
     toast('❌ Kan gebruikers niet laden');
@@ -73,7 +71,6 @@ async function updateUser(userId) {
   const wiChecked= $(`#wic_${userId}`)?.checked ? true : false;
 
   if (!newName) return toast('⚠️ Naam mag niet leeg zijn!');
-
   const payload = { name: newName, WIcreations: wiChecked };
   if (newPhone !== undefined) payload.phone = newPhone;
 
@@ -93,7 +90,6 @@ async function zeroUser(userId) {
 }
 
 async function markAsPaid(userId) {
-  // Alleen onbetaalde drinks (paid=false/NULL) en gebruik historische prijs
   const { data: drinks, error } = await supabase
     .from('drinks')
     .select('id, price_at_purchase, paid')
@@ -106,12 +102,12 @@ async function markAsPaid(userId) {
   }
 
   const total = (drinks || []).reduce((sum, d) => sum + (Number(d?.price_at_purchase) || 0), 0);
-  if (!(total > 0)) return toast('Geen openstaande schuld');
+  if (!(total > 0)) return toast('Geen onbetaalde items');
 
   const ids = (drinks || []).map(d => d.id);
   if (!ids.length) return toast('Geen onbetaalde items gevonden');
 
-  // 1) markeer betrokken drinks als betaald (behoud History)
+  // 1) markeer als betaald
   const { data: updRows, error: updErr } = await supabase
     .from('drinks')
     .update({ paid: true })
@@ -125,7 +121,7 @@ async function markAsPaid(userId) {
     console.warn('[markAsPaid] Niet alle regels staan op paid=true', updRows);
   }
 
-  // 2) betaling registreren (zonder ext_ref)
+  // 2) payment-log (zonder ext_ref)
   const { error: payErr } = await supabase
     .from('payments')
     .insert([{ user_id: userId, amount: total }]);
@@ -146,9 +142,7 @@ async function deleteUser(userId) {
   await loadUsers();
 }
 
-/* ---------------------------
- * Productbeheer
- * --------------------------- */
+// Productbeheer (ongewijzigd op kernlogica, alleen veilig prijs-parsen & image)
 async function loadProducts() {
   const { data: products, error } = await supabase
     .from('products')
@@ -162,9 +156,7 @@ async function loadProducts() {
       const { data } = supabase.storage.from('product-images').getPublicUrl(p.image_url);
       const url = data?.publicUrl || '#';
       return `<img src="${url}" alt="${esc(p.name)}" width="40" />`;
-    } catch {
-      return '—';
-    }
+    } catch { return '—'; }
   }
 
   const rows = (products || []).map(p => {
@@ -182,8 +174,8 @@ async function loadProducts() {
     `;
   }).join('');
 
-  if ($('#tbl-products')) $('#tbl-products').innerHTML = rows; // v2
-  if ($('#productTable')) $('#productTable').innerHTML = rows; // v1
+  if ($('#tbl-products')) $('#tbl-products').innerHTML = rows;
+  if ($('#productTable')) $('#productTable').innerHTML = rows;
 }
 
 async function addProduct() {
@@ -235,7 +227,7 @@ async function deleteProduct(productId) {
   await loadProducts();
 }
 
-/* Expose (v1-compat) */
+/* Expose */
 window.updateUser    = updateUser;
 window.zeroUser      = zeroUser;
 window.markAsPaid    = markAsPaid;
