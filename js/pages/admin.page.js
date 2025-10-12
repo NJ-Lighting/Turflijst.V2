@@ -33,17 +33,18 @@ async function loadUsers() {
       const balance = typeof m.balance === 'number' ? m.balance : 0;
       const count   = typeof m.count   === 'number' ? m.count   : 0;
 
-      const safeName = JSON.stringify(String(u.name ?? '')); // veilig in attribute
+      // Veilig voor inline attribute (bevat dubbele quotes)
+      const safeName = JSON.stringify(String(u.name ?? ''));
 
       return `
         <tr>
           <td>
             ${esc(u.name)}
-            <button class="link" title="Naam bewerken" onclick="editUserName(${u.id}, ${safeName})">✏️</button>
+            <button class="link" title="Naam bewerken" onclick='editUserName(${u.id}, ${safeName})'>✏️</button>
           </td>
           <td>${esc(u.phone || '')}</td>
           <td>
-            <input id="user-wic-${u.id}" type="checkbox" ${u.WIcreations ? 'checked' : ''} onchange="updateUserWIC(${u.id}, this.checked)" />
+            <input id="user-wic-${u.id}" type="checkbox" ${u.WIcreations ? 'checked' : ''} onchange='updateUserWIC(${u.id}, this.checked)' />
           </td>
           <td class="right">${euro(balance)}</td>
           <td class="right">${count}</td>
