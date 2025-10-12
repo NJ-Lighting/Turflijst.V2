@@ -33,11 +33,13 @@ async function loadUsers() {
       const balance = typeof m.balance === 'number' ? m.balance : 0;
       const count   = typeof m.count   === 'number' ? m.count   : 0;
 
+      const safeName = JSON.stringify(String(u.name ?? '')); // veilig in attribute
+
       return `
         <tr>
           <td>
             ${esc(u.name)}
-            <button class="link" title="Naam bewerken" onclick="editUserName(${u.id}, '${esc(u.name)}')">✏️</button>
+            <button class="link" title="Naam bewerken" onclick="editUserName(${u.id}, ${safeName})">✏️</button>
           </td>
           <td>${esc(u.phone || '')}</td>
           <td>
