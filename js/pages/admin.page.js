@@ -10,13 +10,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#btn-add-product')?.addEventListener('click', addProduct);
 });
 
-/* ---------------------------
- * Event delegation (geen inline handlers)
- * --------------------------- */
+/* =========================
+   Event delegation (geen inline handlers)
+   ========================= */
 function bindAdminEvents() {
   const usersTbody = $('#tbl-users');
   const prodsTbody = $('#tbl-products');
-
   if (usersTbody) {
     usersTbody.addEventListener('click', onUsersClick);
     usersTbody.addEventListener('change', onUsersChange);
@@ -71,20 +70,16 @@ function saveProductFromRow(tr, id) {
   return saveProduct(id, name, price);
 }
 
-/* ---------------------------
- * Gebruikersbeheer
- * --------------------------- */
+/* =========================
+   Gebruikersbeheer
+   ========================= */
 async function loadUsers() {
   try {
     const { data: users, error: uErr } = await supabase
       .from('users')
       .select('id, name, phone, "WIcreations"')
       .order('name', { ascending: true });
-
-    if (uErr) {
-      console.error('users load error:', uErr);
-      return toast('❌ Kan gebruikers niet laden');
-    }
+    if (uErr) { console.error('users load error:', uErr); return toast('❌ Kan gebruikers niet laden'); }
 
     let metrics = [];
     try { metrics = await fetchUserMetrics(supabase); } catch {}
@@ -171,15 +166,14 @@ async function markPaid(id) {
   await loadUsers();
 }
 
-/* ---------------------------
- * Productbeheer
- * --------------------------- */
+/* =========================
+   Productbeheer
+   ========================= */
 async function loadProducts() {
   const { data: products, error } = await supabase
     .from('products')
     .select('id, name, price, image_url')
     .order('name', { ascending: true });
-
   if (error) { console.error('loadProducts error:', error); return toast('❌ Kon producten niet laden'); }
 
   function imgCell(p) {
@@ -188,14 +182,12 @@ async function loadProducts() {
       const { data } = supabase.storage.from('product-images').getPublicUrl(p.image_url);
       const url = data?.publicUrl || '#';
       return `<img src="${url}" alt="${esc(p.name)}" style="max-width:48px;max-height:48px;border-radius:6px" />`;
-    } catch {
-      return '—';
-    }
+    } catch { return '—'; }
   }
 
   const rows = (products || []).map(p => {
     const n = Number(p.price ?? 0);
-    const valueAttr = Number.isFinite(n) ? n.toFixed(2) : '0.00';
+    const valueAttr = Number.isFinite(n) ? n.toFixed(2) : '0.00'; // punt-decimaal in value
     return `
       <tr data-prod-id="${p.id}">
         <td>${imgCell(p)}</td>
