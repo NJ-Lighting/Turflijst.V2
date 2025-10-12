@@ -9,9 +9,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#btn-add-product')?.addEventListener('click', addProduct);
 });
 
-/* ---------------------------
- * Gebruikersbeheer
- * --------------------------- */
 async function loadUsers() {
   try {
     const { data: users, error: uErr } = await supabase
@@ -20,19 +17,19 @@ async function loadUsers() {
       .order('name', { ascending: true });
     if (uErr) { console.error('users load error:', uErr); return toast('❌ Kan gebruikers niet laden'); }
 
-    // "Te betalen (€)" via metrics (onbetaalde som met historische prijs).
-    // Fallback: directe som van price_at_purchase voor onbetaalde items.
+    // Primair via metrics (total = som onbetaald met historische prijs)
     const balances = new Map();
     try {
-      const metrics = await fetchUserMetrics(supabase); // [{id, total, ...}]  total = onbetaald
+      const metrics = await fetchUserMetrics(supabase); // [{id, total, ...}]
       for (const m of (metrics || [])) balances.set(m.id, Number(m.total || 0));
     } catch {}
 
+    // Fallback: directe som price_at_purchase van onbetaald (paid=false/NULL)
     if (!balances.size) {
       const { data: drinks } = await supabase
         .from('drinks')
         .select('user_id, price_at_purchase, paid')
-        .or('paid.is.null,paid.eq.false');
+        .or('paid.eq.false,paid.is.null');
       const tmp = {};
       for (const d of (drinks || [])) {
         const uid = d.user_id; // UUID string
@@ -60,8 +57,8 @@ async function loadUsers() {
       `;
     }).join('');
 
-    if ($('#tbl-users'))  $('#tbl-users').innerHTML  = rows; // v2 table body
-    if ($('#userTable'))  $('#userTable').innerHTML  = rows; // v1 compat
+    if ($('#tbl-users')) $('#tbl-users').innerHTML = rows;
+    if ($('#userTable')) $('#userTable').innerHTML = rows;
   } catch (err) {
     console.error('loadUsers error:', err);
     toast('❌ Kan gebruikers niet laden');
@@ -69,18 +66,16 @@ async function loadUsers() {
 }
 
 async function updateUser(userId) {
-  const newName  = $(`#name_${userId}`)?.value?.trim() || '';
+  const newName = $(`#name_${userId}`)?.value?.trim() || '';
   const newPhone = $(`#phone_${userId}`)?.value?.trim() || '';
   const wiChecked= $(`#wic_${userId}`)?.checked ? true : false;
 
   if (!newName) return toast('⚠️ Naam mag niet leeg zijn!');
-
   const payload = { name: newName, WIcreations: wiChecked };
   if (newPhone !== undefined) payload.phone = newPhone;
 
   const { error } = await supabase.from('users').update(payload).eq('id', userId);
   if (error) { console.error('updateUser error:', error); return toast('❌ Fout bij opslaan'); }
-
   toast('✅ Gegevens opgeslagen');
   await loadUsers();
 }
@@ -94,66 +89,59 @@ async function zeroUser(userId) {
 }
 
 async function markAsPaid(userId) {
-  try {
-    // 1) Totaal bepalen op basis van onbetaalde consumpties (historische prijs)
-    const { data: drinks, error } = await supabase
-      .from('drinks')
-      .select('id, price_at_purchase, paid')
-      .eq('user_id', userId)
-      .or('paid.is.null,paid.eq.false');
+  const { data: drinks, error } = await supabase
+    .from('drinks')
+    .select('id, price_at_purchase, paid')
+    .eq('user_id', userId)
+    .or('paid.eq.false,paid.is.null');
 
-    if (error) {
-      console.error('markAsPaid drinks error:', error);
-      return toast('❌ Kan saldo niet bepalen');
-    }
-
-    const total = (drinks || []).reduce((s, d) => s + (Number(d?.price_at_purchase) || 0), 0);
-    if (!(total > 0)) return toast('Geen onbetaalde items');
-
-    // 2) In één statement ALLE onbetaalde regels voor deze user markeren als betaald
-    const { data: updRows, error: updErr, count } = await supabase
-      .from('drinks')
-      .update({ paid: true })
-      .eq('user_id', userId)
-      .or('paid.is.null,paid.eq.false')
-      .select('id, paid', { count: 'exact' });
-    if (updErr) {
-      console.error('[markAsPaid] update paid error:', updErr);
-      return toast('❌ Kon drankjes niet markeren als betaald');
-    }
-    console.log('[markAsPaid] rows updated:', count, updRows?.length);
-    if (!((updRows || []).every(r => r?.paid === true))) {
-      console.warn('[markAsPaid] Niet alle regels staan op paid=true', updRows);
-    }
-
-    // 3) Betaling registreren (zonder ext_ref)
-    const { error: payErr } = await supabase
-      .from('payments')
-      .insert([{ user_id: userId, amount: total }]);
-    if (payErr) {
-      console.error('payment insert error:', payErr);
-      return toast('❌ Betaling registreren mislukt');
-    }
-
-    toast(`✅ Betaling van €${total.toFixed(2)} geregistreerd`);
-    await loadUsers(); // haalt totals opnieuw op
-  } catch (e) {
-    console.error('markAsPaid fatal error:', e);
-    toast('❌ Onbekende fout bij betaling');
+  if (error) {
+    console.error('markAsPaid drinks error:', error);
+    return toast('❌ Kan saldo niet bepalen');
   }
+
+  const total = (drinks || []).reduce((sum, d) => sum + (Number(d?.price_at_purchase) || 0), 0);
+  if (!(total > 0)) return toast('Geen onbetaalde items');
+
+  const ids = (drinks || []).map(d => d.id);
+  if (!ids.length) return toast('Geen onbetaalde items gevonden');
+
+  // 1) markeer als betaald
+  const { data: updRows, error: updErr } = await supabase
+    .from('drinks')
+    .update({ paid: true })
+    .in('id', ids)
+    .select('id, paid');
+  if (updErr) {
+    console.error('drinks update paid error:', updErr);
+    return toast('❌ Kon drankjes niet markeren als betaald');
+  }
+  if (!((updRows || []).every(r => r?.paid === true))) {
+    console.warn('[markAsPaid] Niet alle regels staan op paid=true', updRows);
+  }
+
+  // 2) payment-log (zonder ext_ref)
+  const { error: payErr } = await supabase
+    .from('payments')
+    .insert([{ user_id: userId, amount: total }]);
+  if (payErr) {
+    console.error('payment insert error:', payErr);
+    return toast('❌ Betaling registreren mislukt');
+  }
+
+  toast(`✅ Betaling van €${total.toFixed(2)} geregistreerd`);
+  await loadUsers();
 }
 
 async function deleteUser(userId) {
-  if (!confirm('Weet je zeker dat je deze gebruiker wilt verwijderen?')) return;
+  if (!confirm('Weet je zeker dat je dit product wilt verwijderen?')) return;
   const { error } = await supabase.from('users').delete().eq('id', userId);
   if (error) { console.error('deleteUser error:', error); return toast('❌ Verwijderen mislukt'); }
   toast('✅ Gebruiker verwijderd');
   await loadUsers();
 }
 
-/* ---------------------------
- * Productbeheer
- * --------------------------- */
+// Productbeheer
 async function loadProducts() {
   const { data: products, error } = await supabase
     .from('products')
@@ -167,9 +155,7 @@ async function loadProducts() {
       const { data } = supabase.storage.from('product-images').getPublicUrl(p.image_url);
       const url = data?.publicUrl || '#';
       return `<img src="${url}" alt="${esc(p.name)}" width="40" />`;
-    } catch {
-      return '—';
-    }
+    } catch { return '—'; }
   }
 
   const rows = (products || []).map(p => {
@@ -187,8 +173,8 @@ async function loadProducts() {
     `;
   }).join('');
 
-  if ($('#tbl-products')) $('#tbl-products').innerHTML = rows; // v2
-  if ($('#productTable')) $('#productTable').innerHTML = rows; // v1
+  if ($('#tbl-products')) $('#tbl-products').innerHTML = rows;
+  if ($('#productTable')) $('#productTable').innerHTML = rows;
 }
 
 async function addProduct() {
@@ -240,12 +226,11 @@ async function deleteProduct(productId) {
   await loadProducts();
 }
 
-/* Expose (v1-compat) */
-window.updateUser    = updateUser;
-window.zeroUser      = zeroUser;
-window.markAsPaid    = markAsPaid;
-window.deleteUser    = deleteUser;
-
-window.addProduct    = addProduct;
+/* Expose */
+window.updateUser = updateUser;
+window.zeroUser = zeroUser;
+window.markAsPaid = markAsPaid;
+window.deleteUser = deleteUser;
+window.addProduct = addProduct;
 window.updateProduct = updateProduct;
 window.deleteProduct = deleteProduct;
