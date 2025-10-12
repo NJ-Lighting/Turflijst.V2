@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* ---------------------------
- * Gebruikersbeheer (v1 rendering, metrics-driven)
+ * Gebruikersbeheer (nu ook telefoonnummer)
  * --------------------------- */
 async function loadUsers() {
   try {
@@ -24,7 +24,7 @@ async function loadUsers() {
       return toast('❌ Kan gebruikers niet laden');
     }
 
-    // 1) probeer centrale metrics
+    // Metrics ophalen (voor te betalen bedrag)
     const balances = new Map();
     try {
       const metrics = await fetchUserMetrics(supabase);
@@ -33,7 +33,7 @@ async function loadUsers() {
       console.warn('fetchUserMetrics failed, fallback drinks-sum:', e?.message || e);
     }
 
-    // 2) fallback: som van drinks (v1-gedrag)
+    // Fallback: som van drinks
     if (!balances.size) {
       const { data: drinks } = await supabase
         .from('drinks')
@@ -47,17 +47,17 @@ async function loadUsers() {
       for (const uid of Object.keys(tmp)) balances.set(Number(uid), tmp[uid]);
     }
 
-    // 3) render: Naam | Telefoon | WIcreations | Te betalen | Acties (v1)
+    // Render tabel met naam + telefoon + wic + saldo + acties
     const rows = (users || []).map(u => {
       const due = balances.get(u.id) || 0;
       return `
         <tr>
           <td><input id="name_${u.id}" class="input" value="${esc(u.name)}" /></td>
-          <td>${esc(u.phone || '–')}</td>
+          <td><input id="phone_${u.id}" class="input" value="${esc(u.phone || '')}" placeholder="06..." /></td>
           <td><input id="wic_${u.id}" type="checkbox" ${u.WIcreations ? 'checked' : ''} /></td>
           <td>€${Number.isFinite(due) ? due.toFixed(2) : '0.00'}</td>
           <td>
-            <button class="btn" onclick="updateUser('${u.id}')">💾 Naam Wijzigen</button>
+            <button class="btn" onclick="updateUser('${u.id}')">💾 Opslaan</button>
             <button class="btn" onclick="zeroUser('${u.id}')">🔄 Reset</button>
             <button class="btn" onclick="markAsPaid('${u.id}')">✅ Betaald</button>
             <button class="btn" onclick="deleteUser('${u.id}')">❌ Verwijderen</button>
@@ -66,9 +66,8 @@ async function loadUsers() {
       `;
     }).join('');
 
-    // v2 en v1 id-compat
-    if ($('#tbl-users'))   $('#tbl-users').innerHTML   = rows;
-    if ($('#userTable'))   $('#userTable').innerHTML   = rows;
+    if ($('#tbl-users')) $('#tbl-users').innerHTML = rows;
+    if ($('#userTable')) $('#userTable').innerHTML = rows;
   } catch (err) {
     console.error('loadUsers error:', err);
     toast('❌ Kan gebruikers niet laden');
@@ -77,19 +76,25 @@ async function loadUsers() {
 
 async function updateUser(userId) {
   const newName = $(`#name_${userId}`)?.value?.trim() || '';
-  if (!newName) return toast('⚠️ Naam mag niet leeg zijn!');
+  const newPhone = $(`#phone_${userId}`)?.value?.trim() || '';
   const wiChecked = $(`#wic_${userId}`)?.checked ? true : false;
+
+  if (!newName) return toast('⚠️ Naam mag niet leeg zijn!');
+
+  const updateObj = { name: newName, WIcreations: wiChecked };
+  if (newPhone) updateObj.phone = newPhone;
 
   const { error } = await supabase
     .from('users')
-    .update({ name: newName, WIcreations: wiChecked })
+    .update(updateObj)
     .eq('id', userId);
 
   if (error) {
     console.error('updateUser error:', error);
-    return toast('❌ Fout bij updaten');
+    return toast('❌ Fout bij opslaan');
   }
-  toast('✅ Gebruiker bijgewerkt');
+
+  toast('✅ Gegevens opgeslagen');
   await loadUsers();
 }
 
@@ -118,14 +123,12 @@ async function markAsPaid(userId) {
   const total = (drinks || []).reduce((s, d) => s + (d.products?.price || 0), 0);
   if (!(total > 0)) return toast('Geen openstaande schuld');
 
-  // 1) drankjes verwijderen (saldo naar 0)
   const { error: delErr } = await supabase.from('drinks').delete().eq('user_id', userId);
   if (delErr) {
     console.error('drinks delete error:', delErr);
     return toast('❌ Kon drankjes niet wissen');
   }
 
-  // 2) betaling registreren
   const { error: payErr } = await supabase
     .from('payments')
     .insert([{ user_id: userId, amount: total, ext_ref: `adminpay-${userId}-${Date.now()}` }]);
@@ -150,7 +153,7 @@ async function deleteUser(userId) {
 }
 
 /* ---------------------------
- * Productbeheer (v1 rendering)
+ * Productbeheer (ongewijzigd)
  * --------------------------- */
 async function loadProducts() {
   const { data: products, error } = await supabase
@@ -243,7 +246,7 @@ async function deleteProduct(id) {
   await loadProducts();
 }
 
-/* Expose voor inline onclicks (v1-parity) */
+/* Expose voor inline onclicks */
 window.updateUser    = updateUser;
 window.zeroUser      = zeroUser;
 window.markAsPaid    = markAsPaid;
