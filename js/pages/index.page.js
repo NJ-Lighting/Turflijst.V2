@@ -5,12 +5,10 @@ import { fetchUserDrinkPivot, fetchUserTotalsCurrentPrice } from '../api/metrics
 document.addEventListener('DOMContentLoaded', async () => {
   await loadUsers();
   await loadProducts();
-
   $('#user')?.addEventListener('change', () => {
     renderTotalsFromMetrics();
     renderPivotFromMetrics();
   });
-
   await renderTotalsFromMetrics();
   await renderPivotFromMetrics();
 });
@@ -20,14 +18,14 @@ let isLogging = false;
 let isUndoing = false;
 let lastLogAt = 0;
 let lastUndoAt = 0;
-const THROTTLE_MS = 600; // Max 1 undo per laatst gelogde actie
+const THROTTLE_MS = 600;
+// Max 1 undo per laatst gelogde actie
 let canUndo = false;
 
 function setUiBusy(busy) {
   document.querySelectorAll('#product-buttons button.btn').forEach(b => b.disabled = busy);
   const undoBtn = document.getElementById('undo-btn');
   if (undoBtn) undoBtn.disabled = busy;
-
   const grid = document.getElementById('product-buttons');
   if (grid) {
     grid.style.pointerEvents = busy ? 'none' : '';
@@ -53,11 +51,8 @@ async function loadUsers() {
   let html = `<option value="">-- Kies gebruiker --</option>`;
   let seenSplit = false;
   sorted.forEach(u => {
-    if (!u.WIcreations && !seenSplit) {
-      html += `<option value="" disabled>────────────</option>`;
-      seenSplit = true;
-    }
-    html += `<option value="${u.id}">${esc(u.name)}</option>`;
+    if (!u.WIcreations && !seenSplit) { html += `<option disabled>────────────</option>`; seenSplit = true; }
+    html += `<option value="${esc(u.id)}">${esc(u.name)}</option>`;
   });
   sel.innerHTML = html;
 }
@@ -78,43 +73,34 @@ async function loadProducts() {
 
   const grid = $('#product-buttons');
   if (!grid) return;
-
   grid.classList.add('product-grid');
   grid.innerHTML = '';
 
   const BUCKET_URL = 'https://stmpommlhkokcjkwivfc.supabase.co/storage/v1/object/public/product-images/';
 
-  (products || [])
-    .filter(p => (stockMap.get(p.id) || 0) > 0)
-    .forEach(p => {
-      const wrap = document.createElement('div');
-      const btn = document.createElement('button');
-      btn.className = 'btn drink-btn';
-      btn.type = 'button';
-
-      const imgTag = p.image_url ? `<img alt="${esc(p.name)}" src="${BUCKET_URL + p.image_url}" />` : '';
-      btn.innerHTML = `${imgTag}
-${esc(p.name)}
-
-${euro(p.price)}
-`;
-
-      btn.addEventListener('click', async () => {
-        if (btn.disabled) return;
-        btn.disabled = true;
-        try { await logDrink(p.id); }
-        finally { btn.disabled = false; }
-      });
-
-      wrap.appendChild(btn);
-      grid.appendChild(wrap);
+  (products || []).filter(p => (stockMap.get(p.id) || 0) > 0).forEach(p => {
+    const wrap = document.createElement('div');
+    const btn  = document.createElement('button');
+    btn.className = 'btn drink-btn';
+    btn.type = 'button';
+    const imgTag = p.image_url ? `<img src="${BUCKET_URL + esc(p.image_url)}" alt="${esc(p.name)}">` : '';
+    btn.innerHTML = `${imgTag}<div><div>${esc(p.name)}</div><div>${euro(p.price)}</div></div>`;
+    btn.addEventListener('click', async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      try { await logDrink(p.id); }
+      finally { btn.disabled = false; }
     });
+    wrap.appendChild(btn);
+    grid.appendChild(wrap);
+  });
 }
 
 window.logDrink = async (productId) => {
   const now = Date.now();
   if (isLogging || (now - lastLogAt) < THROTTLE_MS) return;
   lastLogAt = now;
+
   isLogging = true;
   setUiBusy(true);
 
@@ -134,10 +120,8 @@ window.logDrink = async (productId) => {
     .order('created_at', { ascending: true })
     .limit(1)
     .single();
-
   if (obErr || !oldest || (Number(oldest.quantity) || 0) <= 0) {
-    setUiBusy(false);
-    isLogging = false;
+    setUiBusy(false); isLogging = false;
     return toast('❌ Geen voorraad meer voor dit product');
   }
 
@@ -149,11 +133,7 @@ window.logDrink = async (productId) => {
       price_at_purchase: oldest.price_per_piece,
       batch_id: oldest.id
     }]);
-    if (dErr) {
-      setUiBusy(false);
-      isLogging = false;
-      return toast('❌ Fout bij loggen drankje');
-    }
+    if (dErr) { setUiBusy(false); isLogging = false; return toast('❌ Fout bij loggen drankje'); }
   }
 
   // 3) Batch -1
@@ -162,16 +142,11 @@ window.logDrink = async (productId) => {
     const { error: uErr } = await supabase.from('stock_batches')
       .update({ quantity: newQty })
       .eq('id', oldest.id);
-    if (uErr) {
-      setUiBusy(false);
-      isLogging = false;
-      return toast('❌ Fout bij afboeken voorraad');
-    }
+    if (uErr) { setUiBusy(false); isLogging = false; return toast('❌ Fout bij afboeken voorraad'); }
   }
 
   await loadProducts();
-  const sel = $('#user');
-  if (sel) sel.value = '';
+  const sel = $('#user'); if (sel) sel.value = '';
 
   try {
     toast('✅ Drankje toegevoegd');
@@ -189,23 +164,19 @@ window.undoLastDrink = async (el) => {
   if (el && !el.disabled) el.disabled = true;
 
   const now = Date.now();
-  if (isUndoing || (now - lastUndoAt) < THROTTLE_MS) {
-    if (el) el.disabled = false;
-    return;
-  }
+  if (isUndoing || (now - lastUndoAt) < THROTTLE_MS) { if (el) el.disabled = false; return; }
   lastUndoAt = now;
+
   isUndoing = true;
   setUiBusy(true);
 
-  // laatste ONBETAALDE drink incl. batch & prijs (paid=false/NULL)
+  // laatste drink incl. batch & prijs
   const { data: last, error } = await supabase
     .from('drinks')
-    .select('id, user_id, product_id, batch_id, price_at_purchase, paid')
-    .or('paid.is.null,paid.eq.false')
+    .select('id, user_id, product_id, batch_id, price_at_purchase')
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
-
   if (error || !last) {
     toast('❌ Geen drankje om te verwijderen');
     setUiBusy(false);
@@ -217,12 +188,7 @@ window.undoLastDrink = async (el) => {
   // drink verwijderen
   {
     const { error: delErr } = await supabase.from('drinks').delete().eq('id', last.id);
-    if (delErr) {
-      setUiBusy(false);
-      isUndoing = false;
-      if (el) el.disabled = false;
-      return toast('❌ Fout bij verwijderen drankje');
-    }
+    if (delErr) { setUiBusy(false); isUndoing = false; if (el) el.disabled = false; return toast('❌ Fout bij verwijderen drankje'); }
   }
 
   // voorraad exact op oorspronkelijke batch terugboeken (of nieuwe batch met bewaarde prijs)
@@ -261,14 +227,14 @@ window.undoLastDrink = async (el) => {
 
 async function renderTotalsFromMetrics(){
   try{
-    $('#totalToPayList').innerHTML = `Laden…`;
+    $('#totalToPayList').innerHTML = `<tr><td colspan="2">Laden…</td></tr>`;
     const rows = await fetchUserTotalsCurrentPrice(supabase);
     $('#totalToPayList').innerHTML =
-      (rows || []).map(r => `<li>${esc(r.name)} <strong>${euro(r.amount)}</strong></li>`).join('') ||
-      `Nog geen data`;
+      (rows || []).map(r => `<tr><td>${esc(r.name)}</td><td class="right">${euro(r.amount)}</td></tr>`).join('') ||
+      `<tr><td colspan="2" style="opacity:.7">Nog geen data</td></tr>`;
   }catch(e){
     console.error('renderTotalsFromMetrics:', e);
-    $('#totalToPayList').innerHTML = `Kon bedragen niet laden`;
+    $('#totalToPayList').innerHTML = `<tr><td colspan="2">Kon bedragen niet laden</td></tr>`;
   }
 }
 
@@ -276,14 +242,13 @@ async function renderPivotFromMetrics(){
   try{
     const { products, rows } = await fetchUserDrinkPivot(supabase);
     $('#userDrinkTotalsHead').innerHTML =
-      `<tr><th>Gebruiker</th>${products.map(p => `<th>${esc(p)}</th>`).join('')}</tr>`;
+      `<tr><th>Gebruiker</th>${products.map(p => `<th class="right">${esc(p)}</th>`).join('')}</tr>`;
     $('#userDrinkTotalsBody').innerHTML =
-      (rows || []).map(r =>
-        `<tr><td>${esc(r.user)}</td>${r.counts.map(c => `<td>${c}</td>`).join('')}</tr>`
-      ).join('') || `<tr><td colspan="999">Nog geen data</td></tr>`;
+      (rows || []).map(r => `<tr><td>${esc(r.user)}</td>${r.counts.map(c => `<td class="right">${c}</td>`).join('')}</tr>`).join('') ||
+      `<tr><td colspan="${1 + products.length}" style="opacity:.7">Nog geen data</td></tr>`;
   } catch(e){
     console.error('renderPivotFromMetrics:', e);
     $('#userDrinkTotalsHead').innerHTML = '';
-    $('#userDrinkTotalsBody').innerHTML = `<tr><td colspan="999">Kon gegevens niet laden</td></tr>`;
+    $('#userDrinkTotalsBody').innerHTML = `<tr><td>Kon gegevens niet laden</td></tr>`;
   }
 }
