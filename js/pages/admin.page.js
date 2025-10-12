@@ -12,22 +12,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 /* ---------------------------
  * Gebruikersbeheer
  * --------------------------- */
-
 async function loadUsers() {
   try {
-    // Users incl. WIcreations (voor checkbox)
+    // Users incl. WIcreations (checkbox) en telefoon
     const { data: users, error: uErr } = await supabase
       .from('users')
       .select('id, name, phone, "WIcreations"')
       .order('name', { ascending: true });
+
     if (uErr) {
       console.error('users load error:', uErr);
       return toast('❌ Kan gebruikers niet laden');
     }
 
-    // Metrics (balance & count)
+    // Metrics (saldo & aantal drankjes)
     let metrics = [];
-    try { metrics = await fetchUserMetrics(supabase); } catch {}
+    try {
+      metrics = await fetchUserMetrics(supabase);
+    } catch {
+      // metrics optioneel
+    }
     const metricById = new Map((metrics || []).map(m => [m.id, m]));
 
     const rows = (users || []).map(u => {
@@ -36,20 +40,17 @@ async function loadUsers() {
       const count   = typeof m.count   === 'number' ? m.count   : 0;
 
       return `
-        <tr data-id="${esc(u.id)}">
+        <tr>
+          <td><input id="user-name-${u.id}" class="input" value="${esc(u.name)}" /></td>
+          <td>${esc(u.phone || '')}</td>
+          <td><input id="user-wic-${u.id}" type="checkbox" ${u.WIcreations ? 'checked' : ''} /></td>
+          <td class="right">${euro(balance)}</td>
+          <td class="right">${count}</td>
           <td>
-            <input id="user-name-${u.id}" class="input" value="${esc(u.name || '')}" />
-          </td>
-          <td class="muted">${esc(u.phone || '')}</td>
-          <td style="text-align:center">
-            <input id="user-wic-${u.id}" type="checkbox" ${u.WIcreations ? 'checked' : ''} />
-          </td>
-          <td style="text-align:right">${euro(balance)} <small class="muted">(${count})</small></td>
-          <td>
-            <button class="btn" onclick="updateUser(${u.id})">💾 Opslaan</button>
-            <button class="btn" onclick="zeroUser(${u.id})">↩️ Nulzetten</button>
-            <button class="btn warn" onclick="markPaid(${u.id})">✅ Betaald</button>
-            <button class="btn danger" onclick="deleteUser(${u.id})">🗑️ Verwijderen</button>
+            <button onclick="updateUser(${u.id})">Opslaan</button>
+            <button onclick="zeroUser(${u.id})">↩️ Nulzetten</button>
+            <button onclick="markPaid(${u.id})">✅ Betaald</button>
+            <button onclick="deleteUser(${u.id})">🗑️ Verwijderen</button>
           </td>
         </tr>
       `;
@@ -65,6 +66,7 @@ async function loadUsers() {
 async function updateUser(id) {
   const name = $(`#user-name-${id}`)?.value?.trim() || '';
   const wic  = $(`#user-wic-${id}`)?.checked ? true : false;
+
   if (!name) return toast('⚠️ Naam is verplicht');
 
   const { error } = await supabase
@@ -103,11 +105,12 @@ async function deleteUser(id) {
 }
 
 async function markPaid(id) {
-  // Bereken actuele som van onbetaalde drinks × actuele productprijs
+  // Bepaal actueel openstaand saldo uit 'drinks' × actuele productprijs
   const { data: drinks, error } = await supabase
     .from('drinks')
     .select('products(price)')
     .eq('user_id', id);
+
   if (error) {
     console.error('markPaid drinks error:', error);
     return toast('❌ Kan saldo niet bepalen');
@@ -116,17 +119,18 @@ async function markPaid(id) {
   const total = (drinks || []).reduce((s, d) => s + (d.products?.price || 0), 0);
   if (!(total > 0)) return toast('Geen openstaand saldo');
 
-  // 1) betaling registreren
+  // 1) Betaling registreren
   const extRef = `adminpay-${id}-${Date.now()}`;
   const { error: pErr } = await supabase
     .from('payments')
     .insert([{ user_id: id, amount: total, ext_ref: extRef }]);
+
   if (pErr) {
     console.error('payment insert error:', pErr);
     return toast('❌ Betaling registreren mislukt');
   }
 
-  // 2) drankjes wissen (saldo naar 0)
+  // 2) Drankjes wissen (saldo naar 0)
   const { error: dErr } = await supabase.from('drinks').delete().eq('user_id', id);
   if (dErr) {
     console.error('drinks delete after pay error:', dErr);
@@ -137,16 +141,9 @@ async function markPaid(id) {
   await loadUsers();
 }
 
-// Expose voor inline onclicks
-window.updateUser = updateUser;
-window.zeroUser   = zeroUser;
-window.deleteUser = deleteUser;
-window.markPaid   = markPaid;
-
 /* ---------------------------
  * Productbeheer
  * --------------------------- */
-
 async function loadProducts() {
   const { data: products, error } = await supabase
     .from('products')
@@ -163,20 +160,20 @@ async function loadProducts() {
     try {
       const { data } = supabase.storage.from('product-images').getPublicUrl(p.image_url);
       const url = data?.publicUrl || '#';
-      return `<img src="${esc(url)}" alt="product" style="width:40px;height:40px;object-fit:cover;border-radius:6px" />`;
+      return `<img src="${url}" alt="${esc(p.name)}" style="max-width:48px;max-height:48px;border-radius:6px" />`;
     } catch {
       return '—';
     }
   }
 
   const rows = (products || []).map(p => `
-    <tr data-id="${esc(p.id)}">
+    <tr>
       <td>${imgCell(p)}</td>
       <td><input id="prod-name-${p.id}" class="input" value="${esc(p.name)}" /></td>
-      <td><input id="prod-price-${p.id}" class="input" inputmode="decimal" value="${String(Number(p.price || 0).toFixed(2)).replace('.', ',')}" /></td>
+      <td><input id="prod-price-${p.id}" class="input" type="number" step="0.01" inputmode="decimal" value="${String(p.price ?? '').replace('.', ',')}" /></td>
       <td>
-        <button class="btn" onclick="saveProduct(${p.id})">💾 Opslaan</button>
-        <button class="btn danger" onclick="deleteProduct(${p.id})">🗑️ Verwijderen</button>
+        <button onclick="saveProduct(${p.id})">Opslaan</button>
+        <button onclick="deleteProduct(${p.id})">🗑️ Verwijderen</button>
       </td>
     </tr>
   `).join('');
@@ -185,9 +182,9 @@ async function loadProducts() {
 }
 
 async function addProduct() {
-  const name  = $('#new-product-name')?.value?.trim();
+  const name = $('#new-product-name')?.value?.trim();
   const price = parseFloat(($('#new-product-price')?.value || '').replace(',', '.'));
-  const file  = $('#new-product-image')?.files?.[0];
+  const file = $('#new-product-image')?.files?.[0];
 
   if (!name) return toast('⚠️ Vul een productnaam in');
   if (!(price >= 0)) return toast('⚠️ Vul een geldige prijs in');
@@ -210,16 +207,18 @@ async function addProduct() {
   }
 
   toast('✅ Product toegevoegd');
-  if ($('#new-product-name'))  $('#new-product-name').value = '';
+  if ($('#new-product-name'))  $('#new-product-name').value  = '';
   if ($('#new-product-price')) $('#new-product-price').value = '';
   if ($('#new-product-image')) $('#new-product-image').value = '';
+
   await loadProducts();
 }
 
 async function saveProduct(id) {
   const name  = $(`#prod-name-${id}`)?.value?.trim();
   const price = parseFloat(($(`#prod-price-${id}`)?.value || '').replace(',', '.'));
-  if (!name) return toast('⚠️ Naam is verplicht');
+
+  if (!name)        return toast('⚠️ Naam is verplicht');
   if (!(price >= 0)) return toast('⚠️ Ongeldige prijs');
 
   const { error } = await supabase.from('products').update({ name, price }).eq('id', id);
@@ -227,6 +226,7 @@ async function saveProduct(id) {
     console.error('saveProduct error:', error);
     return toast('❌ Bijwerken mislukt');
   }
+
   toast('✅ Product opgeslagen');
   await loadProducts();
 }
@@ -239,11 +239,19 @@ async function deleteProduct(id) {
     console.error('deleteProduct error:', error);
     return toast('❌ Verwijderen mislukt');
   }
+
   toast('✅ Product verwijderd');
   await loadProducts();
 }
 
-// Expose
-window.addProduct    = addProduct;
-window.saveProduct   = saveProduct;
-window.deleteProduct = deleteProduct;
+/* ---------------------------
+ * Expose (inline onclicks)
+ * --------------------------- */
+window.updateUser   = updateUser;
+window.zeroUser     = zeroUser;
+window.deleteUser   = deleteUser;
+window.markPaid     = markPaid;
+
+window.addProduct   = addProduct;
+window.saveProduct  = saveProduct;
+window.deleteProduct= deleteProduct;
