@@ -14,7 +14,6 @@ document.addEventListener('DOMContentLoaded', async () => {
  * --------------------------- */
 async function loadUsers() {
   try {
-    // Users incl. WIcreations (checkbox) en telefoon
     const { data: users, error: uErr } = await supabase
       .from('users')
       .select('id, name, phone, "WIcreations"')
@@ -25,13 +24,8 @@ async function loadUsers() {
       return toast('❌ Kan gebruikers niet laden');
     }
 
-    // Metrics (saldo & aantal drankjes)
     let metrics = [];
-    try {
-      metrics = await fetchUserMetrics(supabase);
-    } catch {
-      // metrics optioneel
-    }
+    try { metrics = await fetchUserMetrics(supabase); } catch {}
     const metricById = new Map((metrics || []).map(m => [m.id, m]));
 
     const rows = (users || []).map(u => {
@@ -105,7 +99,6 @@ async function deleteUser(id) {
 }
 
 async function markPaid(id) {
-  // Bepaal actueel openstaand saldo uit 'drinks' × actuele productprijs
   const { data: drinks, error } = await supabase
     .from('drinks')
     .select('products(price)')
@@ -119,7 +112,6 @@ async function markPaid(id) {
   const total = (drinks || []).reduce((s, d) => s + (d.products?.price || 0), 0);
   if (!(total > 0)) return toast('Geen openstaand saldo');
 
-  // 1) Betaling registreren
   const extRef = `adminpay-${id}-${Date.now()}`;
   const { error: pErr } = await supabase
     .from('payments')
@@ -130,7 +122,6 @@ async function markPaid(id) {
     return toast('❌ Betaling registreren mislukt');
   }
 
-  // 2) Drankjes wissen (saldo naar 0)
   const { error: dErr } = await supabase.from('drinks').delete().eq('user_id', id);
   if (dErr) {
     console.error('drinks delete after pay error:', dErr);
@@ -166,17 +157,21 @@ async function loadProducts() {
     }
   }
 
-  const rows = (products || []).map(p => `
-    <tr>
-      <td>${imgCell(p)}</td>
-      <td><input id="prod-name-${p.id}" class="input" value="${esc(p.name)}" /></td>
-      <td><input id="prod-price-${p.id}" class="input" type="number" step="0.01" inputmode="decimal" value="${String(p.price ?? '').replace('.', ',')}" /></td>
-      <td>
-        <button onclick="saveProduct(${p.id})">Opslaan</button>
-        <button onclick="deleteProduct(${p.id})">🗑️ Verwijderen</button>
-      </td>
-    </tr>
-  `).join('');
+  const rows = (products || []).map(p => {
+    const num = Number(p.price ?? 0);
+    const valueAttr = Number.isFinite(num) ? num.toFixed(2) : '0.00'; // <-- PUNT, geen komma
+    return `
+      <tr>
+        <td>${imgCell(p)}</td>
+        <td><input id="prod-name-${p.id}" class="input" value="${esc(p.name)}" /></td>
+        <td><input id="prod-price-${p.id}" class="input" type="number" step="0.01" inputmode="decimal" value="${valueAttr}" /></td>
+        <td>
+          <button onclick="saveProduct(${p.id})">Opslaan</button>
+          <button onclick="deleteProduct(${p.id})">🗑️ Verwijderen</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
 
   $('#tbl-products').innerHTML = rows || '';
 }
@@ -216,9 +211,10 @@ async function addProduct() {
 
 async function saveProduct(id) {
   const name  = $(`#prod-name-${id}`)?.value?.trim();
+  // accepteer zowel komma als punt
   const price = parseFloat(($(`#prod-price-${id}`)?.value || '').replace(',', '.'));
 
-  if (!name)        return toast('⚠️ Naam is verplicht');
+  if (!name)         return toast('⚠️ Naam is verplicht');
   if (!(price >= 0)) return toast('⚠️ Ongeldige prijs');
 
   const { error } = await supabase.from('products').update({ name, price }).eq('id', id);
@@ -245,13 +241,13 @@ async function deleteProduct(id) {
 }
 
 /* ---------------------------
- * Expose (inline onclicks)
+ * Expose
  * --------------------------- */
-window.updateUser   = updateUser;
-window.zeroUser     = zeroUser;
-window.deleteUser   = deleteUser;
-window.markPaid     = markPaid;
+window.updateUser    = updateUser;
+window.zeroUser      = zeroUser;
+window.deleteUser    = deleteUser;
+window.markPaid      = markPaid;
 
-window.addProduct   = addProduct;
-window.saveProduct  = saveProduct;
-window.deleteProduct= deleteProduct;
+window.addProduct    = addProduct;
+window.saveProduct   = saveProduct;
+window.deleteProduct = deleteProduct;
