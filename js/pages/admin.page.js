@@ -103,47 +103,74 @@ async function zeroUser(userId) {
 
 async function markAsPaid(userId) {
   try {
-    // 1) Onbetaald ophalen
-    const { data: drinks, error } = await supabase
+    // 0) Selecteer alle onbetaalde items vooraf
+    const { data: unpaid, error: selErr } = await supabase
       .from('drinks')
       .select('id, price_at_purchase, paid')
       .eq('user_id', userId)
       .or('paid.eq.false,paid.is.null');
-    if (error) {
-      console.error('markAsPaid drinks error:', error);
-      return toast('❌ Kan saldo niet bepalen');
+    if (selErr) {
+      console.error('[markAsPaid] select unpaid error:', selErr);
+      return toast('❌ Kan onbetaalde items niet ophalen');
     }
-    console.table(drinks, ['id', 'price_at_purchase', 'paid']);
+    console.table(unpaid, ['id', 'price_at_purchase', 'paid']);
 
-    const total = (drinks || []).reduce((sum, d) => sum + (Number(d?.price_at_purchase) || 0), 0);
+    const total = (unpaid || []).reduce((s, d) => s + (Number(d?.price_at_purchase) || 0), 0);
     if (!(total > 0)) return toast('Geen onbetaalde items');
 
-    // 2) Alles in één keer op paid=true
-    const { data: updRows, error: updErr, count } = await supabase
+    const ids = (unpaid || []).map(d => d.id);
+    if (!ids.length) return toast('Geen onbetaalde items gevonden');
+
+    // 1) Snel: conditioneel alle unpaid van user op paid=true
+    let { error: updErr1, count: count1 } = await supabase
       .from('drinks')
       .update({ paid: true })
       .eq('user_id', userId)
       .or('paid.eq.false,paid.is.null')
-      .select('id, paid', { count: 'exact' });
-    if (updErr) {
-      console.error('[markAsPaid] update paid error:', updErr);
-      return toast('❌ Kon drankjes niet markeren als betaald');
+      .select('id', { count: 'exact' });
+    if (updErr1) {
+      console.warn('[markAsPaid] conditional update error, fallback to .in()', updErr1);
+      count1 = 0;
     }
-    console.log('[markAsPaid] rows updated (paid=true):', count);
+    console.log('[markAsPaid] conditional rows updated:', count1 || 0);
 
-    // 2b) Verifieer dat er niets onbetaald overblijft
-    const { data: stillUnpaid, error: reErr } = await supabase
+    // 2) Hercheck – indien nodig fallback met .in(ids)
+    let { data: stillUnpaid, error: reErr1 } = await supabase
       .from('drinks')
       .select('id')
       .eq('user_id', userId)
       .or('paid.eq.false,paid.is.null');
-    if (reErr) console.error('[markAsPaid] recheck error:', reErr);
-    console.log('[markAsPaid] unpaid after update:', stillUnpaid?.length || 0);
-    if ((stillUnpaid?.length || 0) > 0) {
-      toast('⚠️ Niet alle items konden op betaald gezet worden');
+    if (reErr1) console.error('[markAsPaid] recheck#1 error:', reErr1);
+    const remain1 = stillUnpaid?.length || 0;
+    console.log('[markAsPaid] unpaid after conditional update:', remain1);
+
+    if (remain1 > 0) {
+      const { error: updErr2, count: count2 } = await supabase
+        .from('drinks')
+        .update({ paid: true })
+        .in('id', ids)
+        .select('id', { count: 'exact' });
+      if (updErr2) {
+        console.error('[markAsPaid] fallback .in(ids) failed:', updErr2);
+        return toast('❌ Markeren als betaald is deels mislukt');
+      }
+      console.log('[markAsPaid] fallback .in(ids) rows updated:', count2 || 0);
+
+      // 3) Laatste hercheck
+      const { data: stillUnpaid2, error: reErr2 } = await supabase
+        .from('drinks')
+        .select('id')
+        .eq('user_id', userId)
+        .or('paid.eq.false,paid.is.null');
+      if (reErr2) console.error('[markAsPaid] recheck#2 error:', reErr2);
+      const remain2 = stillUnpaid2?.length || 0;
+      console.log('[markAsPaid] unpaid after fallback update:', remain2);
+      if (remain2 > 0) {
+        toast(`⚠️ ${remain2} item(s) konden niet op betaald gezet worden`);
+      }
     }
 
-    // 3) Payment registreren
+    // 4) Payment loggen (audit)
     const { error: payErr } = await supabase
       .from('payments')
       .insert([{ user_id: userId, amount: total }]);
@@ -153,7 +180,7 @@ async function markAsPaid(userId) {
     }
 
     toast(`✅ Betaling van €${total.toFixed(2)} geregistreerd`);
-    await loadUsers();
+    await loadUsers(); // moet due → 0 maken
   } catch (e) {
     console.error('markAsPaid fatal error:', e);
     toast('❌ Onbekende fout bij betaling');
@@ -272,7 +299,7 @@ async function deleteProduct(productId) {
   await loadProducts();
 }
 
-/* ---------- Expose voor inline onclick ---------- */
+/* ---------- Expose (inline onclick expects globals) ---------- */
 if (typeof window !== 'undefined') {
   Object.assign(window, {
     updateUser,
