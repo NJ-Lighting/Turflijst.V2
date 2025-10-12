@@ -10,46 +10,43 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* ---------------------------
- * Gebruikersbeheer (nu ook telefoonnummer)
+ * Gebruikersbeheer — Te betalen = SOM(price_at_purchase), net als index
  * --------------------------- */
 async function loadUsers() {
   try {
+    // Users incl. telefoon + WIcreations
     const { data: users, error: uErr } = await supabase
       .from('users')
       .select('id, name, phone, "WIcreations"')
       .order('name', { ascending: true });
+    if (uErr) { console.error('users load error:', uErr); return toast('❌ Kan gebruikers niet laden'); }
 
-    if (uErr) {
-      console.error('users load error:', uErr);
-      return toast('❌ Kan gebruikers niet laden');
-    }
-
-    // Metrics ophalen (voor te betalen bedrag)
-    const balances = new Map();
+    // 1) Probeer totals uit metrics (niet balance!)
+    const totalsMap = new Map(); // user_id -> som(price_at_purchase)
     try {
-      const metrics = await fetchUserMetrics(supabase);
-      for (const m of (metrics || [])) balances.set(m.id, Number(m.balance || 0));
+      const metrics = await fetchUserMetrics(supabase); // verwacht [{id, total, ...}]
+      for (const m of (metrics || [])) totalsMap.set(m.id, Number(m.total || 0));
     } catch (e) {
-      console.warn('fetchUserMetrics failed, fallback drinks-sum:', e?.message || e);
+      console.warn('fetchUserMetrics failed, fallback to drinks.price_at_purchase:', e?.message || e);
     }
 
-    // Fallback: som van drinks
-    if (!balances.size) {
+    // 2) Fallback: rechtstreeks som van drinks.price_at_purchase (zelfde als index)
+    if (!totalsMap.size) {
       const { data: drinks } = await supabase
         .from('drinks')
-        .select('user_id, products(price)');
+        .select('user_id, price_at_purchase');
       const tmp = {};
       for (const d of (drinks || [])) {
         const uid = d.user_id;
-        const price = d?.products?.price || 0;
+        const price = Number(d?.price_at_purchase) || 0;
         tmp[uid] = (tmp[uid] || 0) + price;
       }
-      for (const uid of Object.keys(tmp)) balances.set(Number(uid), tmp[uid]);
+      for (const uid of Object.keys(tmp)) totalsMap.set(Number(uid), tmp[uid]);
     }
 
-    // Render tabel met naam + telefoon + wic + saldo + acties
+    // 3) Render: naam + telefoon (editable), WIC checkbox, Te betalen(€), acties
     const rows = (users || []).map(u => {
-      const due = balances.get(u.id) || 0;
+      const due = totalsMap.get(u.id) || 0;
       return `
         <tr>
           <td><input id="name_${u.id}" class="input" value="${esc(u.name)}" /></td>
@@ -66,8 +63,8 @@ async function loadUsers() {
       `;
     }).join('');
 
-    if ($('#tbl-users')) $('#tbl-users').innerHTML = rows;
-    if ($('#userTable')) $('#userTable').innerHTML = rows;
+    if ($('#tbl-users')) $('#tbl-users').innerHTML = rows;     // v2 markup
+    if ($('#userTable')) $('#userTable').innerHTML = rows;     // v1 compat
   } catch (err) {
     console.error('loadUsers error:', err);
     toast('❌ Kan gebruikers niet laden');
@@ -75,24 +72,17 @@ async function loadUsers() {
 }
 
 async function updateUser(userId) {
-  const newName = $(`#name_${userId}`)?.value?.trim() || '';
+  const newName  = $(`#name_${userId}`)?.value?.trim() || '';
   const newPhone = $(`#phone_${userId}`)?.value?.trim() || '';
-  const wiChecked = $(`#wic_${userId}`)?.checked ? true : false;
+  const wiChecked= $(`#wic_${userId}`)?.checked ? true : false;
 
   if (!newName) return toast('⚠️ Naam mag niet leeg zijn!');
 
-  const updateObj = { name: newName, WIcreations: wiChecked };
-  if (newPhone) updateObj.phone = newPhone;
+  const payload = { name: newName, WIcreations: wiChecked };
+  if (newPhone !== undefined) payload.phone = newPhone;
 
-  const { error } = await supabase
-    .from('users')
-    .update(updateObj)
-    .eq('id', userId);
-
-  if (error) {
-    console.error('updateUser error:', error);
-    return toast('❌ Fout bij opslaan');
-  }
+  const { error } = await supabase.from('users').update(payload).eq('id', userId);
+  if (error) { console.error('updateUser error:', error); return toast('❌ Fout bij opslaan'); }
 
   toast('✅ Gegevens opgeslagen');
   await loadUsers();
@@ -101,10 +91,7 @@ async function updateUser(userId) {
 async function zeroUser(userId) {
   if (!confirm('Weet je zeker dat je deze gebruiker wilt resetten?')) return;
   const { error } = await supabase.from('drinks').delete().eq('user_id', userId);
-  if (error) {
-    console.error('zeroUser error:', error);
-    return toast('❌ Fout bij resetten');
-  }
+  if (error) { console.error('zeroUser error:', error); return toast('❌ Fout bij resetten'); }
   toast('✅ Gebruiker is gereset');
   await loadUsers();
 }
@@ -114,28 +101,18 @@ async function markAsPaid(userId) {
     .from('drinks')
     .select('products(price)')
     .eq('user_id', userId);
-
-  if (error) {
-    console.error('markAsPaid drinks error:', error);
-    return toast('❌ Kan saldo niet bepalen');
-  }
+  if (error) { console.error('markAsPaid drinks error:', error); return toast('❌ Kan saldo niet bepalen'); }
 
   const total = (drinks || []).reduce((s, d) => s + (d.products?.price || 0), 0);
   if (!(total > 0)) return toast('Geen openstaande schuld');
 
   const { error: delErr } = await supabase.from('drinks').delete().eq('user_id', userId);
-  if (delErr) {
-    console.error('drinks delete error:', delErr);
-    return toast('❌ Kon drankjes niet wissen');
-  }
+  if (delErr) { console.error('drinks delete error:', delErr); return toast('❌ Kon drankjes niet wissen'); }
 
   const { error: payErr } = await supabase
     .from('payments')
     .insert([{ user_id: userId, amount: total, ext_ref: `adminpay-${userId}-${Date.now()}` }]);
-  if (payErr) {
-    console.error('payment insert error:', payErr);
-    return toast('❌ Betaling registreren mislukt');
-  }
+  if (payErr) { console.error('payment insert error:', payErr); return toast('❌ Betaling registreren mislukt'); }
 
   toast(`✅ Betaling van €${total.toFixed(2)} geregistreerd`);
   await loadUsers();
@@ -144,10 +121,7 @@ async function markAsPaid(userId) {
 async function deleteUser(userId) {
   if (!confirm('Weet je zeker dat je deze gebruiker wilt verwijderen?')) return;
   const { error } = await supabase.from('users').delete().eq('id', userId);
-  if (error) {
-    console.error('deleteUser error:', error);
-    return toast('❌ Verwijderen mislukt');
-  }
+  if (error) { console.error('deleteUser error:', error); return toast('❌ Verwijderen mislukt'); }
   toast('✅ Gebruiker verwijderd');
   await loadUsers();
 }
@@ -160,11 +134,7 @@ async function loadProducts() {
     .from('products')
     .select('id, name, price, image_url')
     .order('name', { ascending: true });
-
-  if (error) {
-    console.error('loadProducts error:', error);
-    return toast('❌ Kon producten niet laden');
-  }
+  if (error) { console.error('loadProducts error:', error); return toast('❌ Kon producten niet laden'); }
 
   function imgCell(p) {
     if (!p?.image_url) return '—';
@@ -172,9 +142,7 @@ async function loadProducts() {
       const { data } = supabase.storage.from('product-images').getPublicUrl(p.image_url);
       const url = data?.publicUrl || '#';
       return `<img src="${url}" alt="${esc(p.name)}" width="40" />`;
-    } catch {
-      return '—';
-    }
+    } catch { return '—'; }
   }
 
   const rows = (products || []).map(p => {
@@ -225,28 +193,30 @@ async function addProduct() {
   await loadProducts();
 }
 
-async function updateProduct(id) {
-  const name  = $(`#name_${id}`)?.value?.trim();
-  const price = parseFloat(($(`#price_${id}`)?.value || '').replace(',', '.'));
+async function updateProduct(productId) {
+  const name  = $(`#name_${productId}`)?.value?.trim();
+  const price = parseFloat(($(`#price_${productId}`)?.value || '').replace(',', '.'));
   if (!name) return toast('⚠️ Naam is verplicht');
-  if (!(price >= 0)) return toast('⚠️ Ongeldige prijs');
+  if (!Number.isFinite(price) || price < 0) return toast('⚠️ Ongeldige prijs');
 
-  const { error } = await supabase.from('products').update({ name, price }).eq('id', id);
+  const { error } = await supabase.from('products').update({ name, price }).eq('id', productId);
   if (error) { console.error('updateProduct error:', error); return toast('❌ Bijwerken mislukt'); }
 
   toast('✅ Product opgeslagen');
   await loadProducts();
 }
 
-async function deleteProduct(id) {
+async function deleteProduct(productId) {
   if (!confirm('Weet je zeker dat je dit product wilt verwijderen?')) return;
-  const { error } = await supabase.from('products').delete().eq('id', id);
+  const { error } = await supabase.from('products').delete().eq('id', productId);
   if (error) { console.error('deleteProduct error:', error); return toast('❌ Verwijderen mislukt'); }
   toast('✅ Product verwijderd');
   await loadProducts();
 }
 
-/* Expose voor inline onclicks */
+/* ---------------------------
+ * Expose (v1-compat)
+ * --------------------------- */
 window.updateUser    = updateUser;
 window.zeroUser      = zeroUser;
 window.markAsPaid    = markAsPaid;
