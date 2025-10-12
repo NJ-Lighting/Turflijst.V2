@@ -20,29 +20,33 @@ async function loadUsers() {
       .order('name', { ascending: true });
     if (uErr) { console.error('users load error:', uErr); return toast('❌ Kan gebruikers niet laden'); }
 
-    // Te betalen via metrics (centrale bron). Als metrics faalt, fallback op actuele productprijs (oude gedrag).
-    const balances = new Map();
+    // "Te betalen (€)" primair via metrics (som onbetaalde drinks op historische prijs)
+    const totals = new Map();
     try {
-      const metrics = await fetchUserMetrics(supabase);
-      for (const m of (metrics || [])) balances.set(m.id, Number(m.total || 0)); // LET OP: total = onbetaald (paid=false/NULL) na metrics-update
-    } catch {}
+      const metrics = await fetchUserMetrics(supabase); // [{id, total, ...}]
+      for (const m of (metrics || [])) totals.set(m.id, Number(m.total || 0));
+    } catch (e) {
+      console.warn('fetchUserMetrics failed, fallback to drinks.price_at_purchase:', e?.message || e);
+    }
 
-    if (!balances.size) {
+    // Fallback: rechtstreeks som van drinks.price_at_purchase met paid=false/NULL
+    if (!totals.size) {
       const { data: drinks } = await supabase
         .from('drinks')
-        .select('user_id, products(price), paid')
+        .select('user_id, price_at_purchase, paid')
         .or('paid.is.null,paid.eq.false');
       const tmp = {};
       for (const d of (drinks || [])) {
         const uid = d.user_id;
-        const price = d?.products?.price || 0;
+        const price = Number(d?.price_at_purchase) || 0;
         tmp[uid] = (tmp[uid] || 0) + price;
       }
-      for (const uid of Object.keys(tmp)) balances.set(Number(uid), tmp[uid]);
+      for (const uid of Object.keys(tmp)) totals.set(Number(uid), tmp[uid]);
     }
 
+    // Render
     const rows = (users || []).map(u => {
-      const due = balances.get(u.id) || 0;
+      const due = totals.get(u.id) || 0;
       return `
         <tr>
           <td><input id="name_${u.id}" class="input" value="${esc(u.name)}" /></td>
@@ -70,9 +74,8 @@ async function loadUsers() {
 async function updateUser(userId) {
   const newName  = $(`#name_${userId}`)?.value?.trim() || '';
   const newPhone = $(`#phone_${userId}`)?.value?.trim() || '';
-  const wiChecked= $(`#wic_${userId}`)?.checked ? true : false;
-
   if (!newName) return toast('⚠️ Naam mag niet leeg zijn!');
+  const wiChecked = $(`#wic_${userId}`)?.checked ? true : false;
 
   const payload = { name: newName, WIcreations: wiChecked };
   if (newPhone !== undefined) payload.phone = newPhone;
@@ -93,7 +96,7 @@ async function zeroUser(userId) {
 }
 
 async function markAsPaid(userId) {
-  // Neem uitsluitend onbetaalde items (paid=false/NULL) en gebruik price_at_purchase
+  // Alleen onbetaalde drinks (paid=false/NULL) en gebruik historische prijs
   const { data: drinks, error } = await supabase
     .from('drinks')
     .select('id, price_at_purchase, paid')
@@ -105,10 +108,10 @@ async function markAsPaid(userId) {
     return toast('❌ Kan saldo niet bepalen');
   }
 
-  const total = (drinks || []).reduce((s, d) => s + (Number(d?.price_at_purchase) || 0), 0);
+  const total = (drinks || []).reduce((sum, d) => sum + (Number(d?.price_at_purchase) || 0), 0);
   if (!(total > 0)) return toast('Geen openstaande schuld');
 
-  // 1) markeer als betaald (behouden voor History)
+  // 1) markeer betrokken drinks als betaald (behoud History)
   const ids = (drinks || []).map(d => d.id);
   const { error: updErr } = await supabase
     .from('drinks')
@@ -119,10 +122,10 @@ async function markAsPaid(userId) {
     return toast('❌ Kon drankjes niet markeren als betaald');
   }
 
-  // 2) betaling registreren
+  // 2) betaling registreren (zonder ext_ref)
   const { error: payErr } = await supabase
     .from('payments')
-    .insert([{ user_id: userId, amount: total, ext_ref: `adminpay-${userId}-${Date.now()}` }]);
+    .insert([{ user_id: userId, amount: total }]);
   if (payErr) {
     console.error('payment insert error:', payErr);
     return toast('❌ Betaling registreren mislukt');
@@ -148,7 +151,6 @@ async function loadProducts() {
     .from('products')
     .select('id, name, price, image_url')
     .order('name', { ascending: true });
-
   if (error) { console.error('loadProducts error:', error); return toast('❌ Kon producten niet laden'); }
 
   function imgCell(p) {
@@ -157,7 +159,9 @@ async function loadProducts() {
       const { data } = supabase.storage.from('product-images').getPublicUrl(p.image_url);
       const url = data?.publicUrl || '#';
       return `<img src="${url}" alt="${esc(p.name)}" width="40" />`;
-    } catch { return '—'; }
+    } catch {
+      return '—';
+    }
   }
 
   const rows = (products || []).map(p => {
@@ -175,8 +179,8 @@ async function loadProducts() {
     `;
   }).join('');
 
-  if ($('#tbl-products')) $('#tbl-products').innerHTML = rows;
-  if ($('#productTable')) $('#productTable').innerHTML = rows;
+  if ($('#tbl-products')) $('#tbl-products').innerHTML = rows; // v2
+  if ($('#productTable')) $('#productTable').innerHTML = rows; // v1
 }
 
 async function addProduct() {
