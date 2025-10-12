@@ -20,17 +20,14 @@ async function loadUsers() {
       .order('name', { ascending: true });
     if (uErr) { console.error('users load error:', uErr); return toast('❌ Kan gebruikers niet laden'); }
 
-    // "Te betalen (€)" primair via metrics (som onbetaalde drinks op historische prijs)
-    const totals = new Map();
+    // "Te betalen" via metrics (openstaand, historische prijs). Fallback: directe som van price_at_purchase.
+    const balances = new Map();
     try {
-      const metrics = await fetchUserMetrics(supabase); // [{id, total, ...}]
-      for (const m of (metrics || [])) totals.set(m.id, Number(m.total || 0));
-    } catch (e) {
-      console.warn('fetchUserMetrics failed, fallback to drinks.price_at_purchase:', e?.message || e);
-    }
+      const metrics = await fetchUserMetrics(supabase); // [{id, total, paid, balance, ...}]
+      for (const m of (metrics || [])) balances.set(m.id, Number(m.total || 0));
+    } catch {}
 
-    // Fallback: rechtstreeks som van drinks.price_at_purchase met paid=false/NULL
-    if (!totals.size) {
+    if (!balances.size) {
       const { data: drinks } = await supabase
         .from('drinks')
         .select('user_id, price_at_purchase, paid')
@@ -41,12 +38,11 @@ async function loadUsers() {
         const price = Number(d?.price_at_purchase) || 0;
         tmp[uid] = (tmp[uid] || 0) + price;
       }
-      for (const uid of Object.keys(tmp)) totals.set(Number(uid), tmp[uid]);
+      for (const uid of Object.keys(tmp)) balances.set(Number(uid), tmp[uid]);
     }
 
-    // Render
     const rows = (users || []).map(u => {
-      const due = totals.get(u.id) || 0;
+      const due = balances.get(u.id) || 0;
       return `
         <tr>
           <td><input id="name_${u.id}" class="input" value="${esc(u.name)}" /></td>
@@ -74,8 +70,9 @@ async function loadUsers() {
 async function updateUser(userId) {
   const newName  = $(`#name_${userId}`)?.value?.trim() || '';
   const newPhone = $(`#phone_${userId}`)?.value?.trim() || '';
+  const wiChecked= $(`#wic_${userId}`)?.checked ? true : false;
+
   if (!newName) return toast('⚠️ Naam mag niet leeg zijn!');
-  const wiChecked = $(`#wic_${userId}`)?.checked ? true : false;
 
   const payload = { name: newName, WIcreations: wiChecked };
   if (newPhone !== undefined) payload.phone = newPhone;
@@ -111,15 +108,21 @@ async function markAsPaid(userId) {
   const total = (drinks || []).reduce((sum, d) => sum + (Number(d?.price_at_purchase) || 0), 0);
   if (!(total > 0)) return toast('Geen openstaande schuld');
 
-  // 1) markeer betrokken drinks als betaald (behoud History)
   const ids = (drinks || []).map(d => d.id);
-  const { error: updErr } = await supabase
+  if (!ids.length) return toast('Geen onbetaalde items gevonden');
+
+  // 1) markeer betrokken drinks als betaald (behoud History)
+  const { data: updRows, error: updErr } = await supabase
     .from('drinks')
     .update({ paid: true })
-    .in('id', ids);
+    .in('id', ids)
+    .select('id, paid');
   if (updErr) {
     console.error('drinks update paid error:', updErr);
     return toast('❌ Kon drankjes niet markeren als betaald');
+  }
+  if (!((updRows || []).every(r => r?.paid === true))) {
+    console.warn('[markAsPaid] Niet alle regels staan op paid=true', updRows);
   }
 
   // 2) betaling registreren (zonder ext_ref)
