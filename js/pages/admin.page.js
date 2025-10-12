@@ -6,8 +6,70 @@ import { fetchUserMetrics } from '../api/metrics.js';
 document.addEventListener('DOMContentLoaded', async () => {
   await loadUsers();
   await loadProducts();
+  bindAdminEvents();
   $('#btn-add-product')?.addEventListener('click', addProduct);
 });
+
+/* ---------------------------
+ * Event delegation (geen inline handlers)
+ * --------------------------- */
+function bindAdminEvents() {
+  const usersTbody = $('#tbl-users');
+  const prodsTbody = $('#tbl-products');
+
+  if (usersTbody) {
+    usersTbody.addEventListener('click', onUsersClick);
+    usersTbody.addEventListener('change', onUsersChange);
+  }
+  if (prodsTbody) {
+    prodsTbody.addEventListener('click', onProductsClick);
+  }
+}
+
+function onUsersClick(e) {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const tr = btn.closest('tr');
+  const id = Number(tr?.dataset.userId);
+  if (!id) return;
+
+  if (btn.classList.contains('btn-edit-name')) return editNameFromRow(tr, id);
+  if (btn.classList.contains('btn-zero'))     return zeroUser(id);
+  if (btn.classList.contains('btn-paid'))     return markPaid(id);
+  if (btn.classList.contains('btn-delete'))   return deleteUser(id);
+}
+
+function onUsersChange(e) {
+  if (!e.target.classList.contains('wic-toggle')) return;
+  const tr = e.target.closest('tr');
+  const id = Number(tr?.dataset.userId);
+  if (!id) return;
+  updateUserWIC(id, e.target.checked);
+}
+
+function editNameFromRow(tr, id) {
+  const current = tr.querySelector('.user-name')?.textContent?.trim() || '';
+  const next = prompt('Nieuwe naam voor gebruiker:', current);
+  if (!next) return;
+  return updateUserName(id, next.trim());
+}
+
+function onProductsClick(e) {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const tr = btn.closest('tr');
+  const id = Number(tr?.dataset.prodId);
+  if (!id) return;
+
+  if (btn.classList.contains('btn-save-prod')) return saveProductFromRow(tr, id);
+  if (btn.classList.contains('btn-del-prod'))  return deleteProduct(id);
+}
+
+function saveProductFromRow(tr, id) {
+  const name  = tr.querySelector('.prod-name')?.value?.trim() || '';
+  const price = parseFloat((tr.querySelector('.prod-price')?.value || '').replace(',', '.'));
+  return saveProduct(id, name, price);
+}
 
 /* ---------------------------
  * Gebruikersbeheer
@@ -33,25 +95,17 @@ async function loadUsers() {
       const balance = typeof m.balance === 'number' ? m.balance : 0;
       const count   = typeof m.count   === 'number' ? m.count   : 0;
 
-      // Veilig voor inline attribute (bevat dubbele quotes)
-      const safeName = JSON.stringify(String(u.name ?? ''));
-
       return `
-        <tr>
-          <td>
-            ${esc(u.name)}
-            <button class="link" title="Naam bewerken" onclick='editUserName(${u.id}, ${safeName})'>✏️</button>
-          </td>
+        <tr data-user-id="${u.id}">
+          <td><span class="user-name">${esc(u.name)}</span> <button class="link btn-edit-name">✏️</button></td>
           <td>${esc(u.phone || '')}</td>
-          <td>
-            <input id="user-wic-${u.id}" type="checkbox" ${u.WIcreations ? 'checked' : ''} onchange='updateUserWIC(${u.id}, this.checked)' />
-          </td>
+          <td><input class="wic-toggle" type="checkbox" ${u.WIcreations ? 'checked' : ''} /></td>
           <td class="right">${euro(balance)}</td>
           <td class="right">${count}</td>
           <td>
-            <button onclick="zeroUser(${u.id})">Nulzetten</button>
-            <button onclick="markPaid(${u.id})">Betaald</button>
-            <button onclick="deleteUser(${u.id})">🗑️ Verwijderen</button>
+            <button class="btn-zero">Nulzetten</button>
+            <button class="btn-paid">Betaald</button>
+            <button class="btn-delete">🗑️ Verwijderen</button>
           </td>
         </tr>
       `;
@@ -64,15 +118,10 @@ async function loadUsers() {
   }
 }
 
-async function editUserName(id, currentName='') {
-  const name = prompt('Nieuwe naam voor gebruiker:', currentName || '');
-  if (!name) return;
-  const newName = name.trim();
+async function updateUserName(id, newName) {
   if (!newName) return toast('⚠️ Ongeldige naam');
-
   const { error } = await supabase.from('users').update({ name: newName }).eq('id', id);
-  if (error) { console.error('editUserName error:', error); return toast('❌ Bijwerken mislukt'); }
-
+  if (error) { console.error('updateUserName error:', error); return toast('❌ Bijwerken mislukt'); }
   toast('✅ Naam bijgewerkt');
   await loadUsers();
 }
@@ -86,10 +135,7 @@ async function updateUserWIC(id, checked) {
 async function zeroUser(id) {
   if (!confirm('Gebruiker resetten? (alle drankjes wissen)')) return;
   const { error } = await supabase.from('drinks').delete().eq('user_id', id);
-  if (error) {
-    console.error('zeroUser error:', error);
-    return toast('❌ Reset mislukt');
-  }
+  if (error) { console.error('zeroUser error:', error); return toast('❌ Reset mislukt'); }
   toast('✅ Gebruiker op 0 gezet');
   await loadUsers();
 }
@@ -97,10 +143,7 @@ async function zeroUser(id) {
 async function deleteUser(id) {
   if (!confirm('Weet je zeker dat je deze gebruiker wilt verwijderen?')) return;
   const { error } = await supabase.from('users').delete().eq('id', id);
-  if (error) {
-    console.error('deleteUser error:', error);
-    return toast('❌ Verwijderen mislukt');
-  }
+  if (error) { console.error('deleteUser error:', error); return toast('❌ Verwijderen mislukt'); }
   toast('✅ Gebruiker verwijderd');
   await loadUsers();
 }
@@ -110,11 +153,7 @@ async function markPaid(id) {
     .from('drinks')
     .select('products(price)')
     .eq('user_id', id);
-
-  if (error) {
-    console.error('markPaid drinks error:', error);
-    return toast('❌ Kan saldo niet bepalen');
-  }
+  if (error) { console.error('markPaid drinks error:', error); return toast('❌ Kan saldo niet bepalen'); }
 
   const total = (drinks || []).reduce((s, d) => s + (d.products?.price || 0), 0);
   if (!(total > 0)) return toast('Geen openstaand saldo');
@@ -123,17 +162,10 @@ async function markPaid(id) {
   const { error: pErr } = await supabase
     .from('payments')
     .insert([{ user_id: id, amount: total, ext_ref: extRef }]);
-
-  if (pErr) {
-    console.error('payment insert error:', pErr);
-    return toast('❌ Betaling registreren mislukt');
-  }
+  if (pErr) { console.error('payment insert error:', pErr); return toast('❌ Betaling registreren mislukt'); }
 
   const { error: dErr } = await supabase.from('drinks').delete().eq('user_id', id);
-  if (dErr) {
-    console.error('drinks delete after pay error:', dErr);
-    return toast('⚠️ Betaling geregistreerd, maar drankjes niet gewist');
-  }
+  if (dErr) { console.error('drinks delete after pay error:', dErr); return toast('⚠️ Betaling geregistreerd, maar drankjes niet gewist'); }
 
   toast(`✅ Betaling van ${euro(total)} geregistreerd`);
   await loadUsers();
@@ -148,10 +180,7 @@ async function loadProducts() {
     .select('id, name, price, image_url')
     .order('name', { ascending: true });
 
-  if (error) {
-    console.error('loadProducts error:', error);
-    return toast('❌ Kon producten niet laden');
-  }
+  if (error) { console.error('loadProducts error:', error); return toast('❌ Kon producten niet laden'); }
 
   function imgCell(p) {
     if (!p?.image_url) return '—';
@@ -166,15 +195,15 @@ async function loadProducts() {
 
   const rows = (products || []).map(p => {
     const n = Number(p.price ?? 0);
-    const valueAttr = Number.isFinite(n) ? n.toFixed(2) : '0.00'; // punt-decimaal in value
+    const valueAttr = Number.isFinite(n) ? n.toFixed(2) : '0.00';
     return `
-      <tr>
+      <tr data-prod-id="${p.id}">
         <td>${imgCell(p)}</td>
-        <td><input id="prod-name-${p.id}" class="input" value="${esc(p.name)}" /></td>
-        <td><input id="prod-price-${p.id}" class="input" type="number" step="0.01" inputmode="decimal" value="${valueAttr}" /></td>
+        <td><input class="input prod-name" value="${esc(p.name)}" /></td>
+        <td><input class="input prod-price" type="number" step="0.01" inputmode="decimal" value="${valueAttr}" /></td>
         <td>
-          <button onclick="saveProduct(${p.id})">Opslaan</button>
-          <button onclick="deleteProduct(${p.id})">🗑️ Verwijderen</button>
+          <button class="btn-save-prod">Opslaan</button>
+          <button class="btn-del-prod">🗑️ Verwijderen</button>
         </td>
       </tr>
     `;
@@ -210,10 +239,7 @@ async function addProduct() {
   await loadProducts();
 }
 
-async function saveProduct(id) {
-  const name  = $(`#prod-name-${id}`)?.value?.trim();
-  const price = parseFloat(($(`#prod-price-${id}`)?.value || '').replace(',', '.'));
-
+async function saveProduct(id, name, price) {
   if (!name)         return toast('⚠️ Naam is verplicht');
   if (!(price >= 0)) return toast('⚠️ Ongeldige prijs');
 
@@ -233,16 +259,3 @@ async function deleteProduct(id) {
   toast('✅ Product verwijderd');
   await loadProducts();
 }
-
-/* ---------------------------
- * Expose
- * --------------------------- */
-window.editUserName   = editUserName;
-window.updateUserWIC  = updateUserWIC;
-window.zeroUser       = zeroUser;
-window.deleteUser     = deleteUser;
-window.markPaid       = markPaid;
-
-window.addProduct     = addProduct;
-window.saveProduct    = saveProduct;
-window.deleteProduct  = deleteProduct;
