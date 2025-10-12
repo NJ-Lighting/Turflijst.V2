@@ -35,15 +35,19 @@ async function loadUsers() {
 
       return `
         <tr>
-          <td><input id="user-name-${u.id}" class="input" value="${esc(u.name)}" /></td>
+          <td>
+            ${esc(u.name)}
+            <button class="link" title="Naam bewerken" onclick="editUserName(${u.id}, '${esc(u.name)}')">✏️</button>
+          </td>
           <td>${esc(u.phone || '')}</td>
-          <td><input id="user-wic-${u.id}" type="checkbox" ${u.WIcreations ? 'checked' : ''} /></td>
+          <td>
+            <input id="user-wic-${u.id}" type="checkbox" ${u.WIcreations ? 'checked' : ''} onchange="updateUserWIC(${u.id}, this.checked)" />
+          </td>
           <td class="right">${euro(balance)}</td>
           <td class="right">${count}</td>
           <td>
-            <button onclick="updateUser(${u.id})">Opslaan</button>
-            <button onclick="zeroUser(${u.id})">↩️ Nulzetten</button>
-            <button onclick="markPaid(${u.id})">✅ Betaald</button>
+            <button onclick="zeroUser(${u.id})">Nulzetten</button>
+            <button onclick="markPaid(${u.id})">Betaald</button>
             <button onclick="deleteUser(${u.id})">🗑️ Verwijderen</button>
           </td>
         </tr>
@@ -57,23 +61,23 @@ async function loadUsers() {
   }
 }
 
-async function updateUser(id) {
-  const name = $(`#user-name-${id}`)?.value?.trim() || '';
-  const wic  = $(`#user-wic-${id}`)?.checked ? true : false;
+async function editUserName(id, currentName='') {
+  const name = prompt('Nieuwe naam voor gebruiker:', currentName || '');
+  if (!name) return;
+  const newName = name.trim();
+  if (!newName) return toast('⚠️ Ongeldige naam');
 
-  if (!name) return toast('⚠️ Naam is verplicht');
+  const { error } = await supabase.from('users').update({ name: newName }).eq('id', id);
+  if (error) { console.error('editUserName error:', error); return toast('❌ Bijwerken mislukt'); }
 
-  const { error } = await supabase
-    .from('users')
-    .update({ name, "WIcreations": wic })
-    .eq('id', id);
-
-  if (error) {
-    console.error('updateUser error:', error);
-    return toast('❌ Bijwerken mislukt');
-  }
-  toast('✅ Gebruiker opgeslagen');
+  toast('✅ Naam bijgewerkt');
   await loadUsers();
+}
+
+async function updateUserWIC(id, checked) {
+  const { error } = await supabase.from('users').update({ "WIcreations": !!checked }).eq('id', id);
+  if (error) { console.error('updateUserWIC error:', error); return toast('❌ WIC opslaan mislukt'); }
+  toast('✅ Opgeslagen');
 }
 
 async function zeroUser(id) {
@@ -158,8 +162,8 @@ async function loadProducts() {
   }
 
   const rows = (products || []).map(p => {
-    const num = Number(p.price ?? 0);
-    const valueAttr = Number.isFinite(num) ? num.toFixed(2) : '0.00'; // <-- PUNT, geen komma
+    const n = Number(p.price ?? 0);
+    const valueAttr = Number.isFinite(n) ? n.toFixed(2) : '0.00'; // punt-decimaal in value
     return `
       <tr>
         <td>${imgCell(p)}</td>
@@ -188,18 +192,12 @@ async function addProduct() {
   if (file) {
     const filename = `${Date.now()}_${file.name.replace(/\s+/g, '_').toLowerCase()}`;
     const { error: upErr } = await supabase.storage.from('product-images').upload(filename, file);
-    if (upErr) {
-      console.error('upload error:', upErr);
-      return toast('❌ Upload mislukt');
-    }
+    if (upErr) { console.error('upload error:', upErr); return toast('❌ Upload mislukt'); }
     image_url = filename;
   }
 
   const { error } = await supabase.from('products').insert([{ name, price, image_url }]);
-  if (error) {
-    console.error('addProduct error:', error);
-    return toast('❌ Product toevoegen mislukt');
-  }
+  if (error) { console.error('addProduct error:', error); return toast('❌ Product toevoegen mislukt'); }
 
   toast('✅ Product toegevoegd');
   if ($('#new-product-name'))  $('#new-product-name').value  = '';
@@ -211,17 +209,13 @@ async function addProduct() {
 
 async function saveProduct(id) {
   const name  = $(`#prod-name-${id}`)?.value?.trim();
-  // accepteer zowel komma als punt
   const price = parseFloat(($(`#prod-price-${id}`)?.value || '').replace(',', '.'));
 
   if (!name)         return toast('⚠️ Naam is verplicht');
   if (!(price >= 0)) return toast('⚠️ Ongeldige prijs');
 
   const { error } = await supabase.from('products').update({ name, price }).eq('id', id);
-  if (error) {
-    console.error('saveProduct error:', error);
-    return toast('❌ Bijwerken mislukt');
-  }
+  if (error) { console.error('saveProduct error:', error); return toast('❌ Bijwerken mislukt'); }
 
   toast('✅ Product opgeslagen');
   await loadProducts();
@@ -231,10 +225,7 @@ async function deleteProduct(id) {
   if (!confirm('Weet je zeker dat je dit product wilt verwijderen?')) return;
 
   const { error } = await supabase.from('products').delete().eq('id', id);
-  if (error) {
-    console.error('deleteProduct error:', error);
-    return toast('❌ Verwijderen mislukt');
-  }
+  if (error) { console.error('deleteProduct error:', error); return toast('❌ Verwijderen mislukt'); }
 
   toast('✅ Product verwijderd');
   await loadProducts();
@@ -243,11 +234,12 @@ async function deleteProduct(id) {
 /* ---------------------------
  * Expose
  * --------------------------- */
-window.updateUser    = updateUser;
-window.zeroUser      = zeroUser;
-window.deleteUser    = deleteUser;
-window.markPaid      = markPaid;
+window.editUserName   = editUserName;
+window.updateUserWIC  = updateUserWIC;
+window.zeroUser       = zeroUser;
+window.deleteUser     = deleteUser;
+window.markPaid       = markPaid;
 
-window.addProduct    = addProduct;
-window.saveProduct   = saveProduct;
-window.deleteProduct = deleteProduct;
+window.addProduct     = addProduct;
+window.saveProduct    = saveProduct;
+window.deleteProduct  = deleteProduct;
