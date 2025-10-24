@@ -34,14 +34,12 @@ export async function fetchUserMetrics(supabase) {
   }
 
   const rowsOut = (users || []).map(u => {
-    const total = totals.get(u.id) ?? 0;   // onbetaald
-    const count = counts.get(u.id) ?? 0;   // onbetaald
-    const paid  = paidSum.get(u.id) ?? 0;  // som payments
+    const total = totals.get(u.id) ?? 0;  // onbetaald
+    const count = counts.get(u.id) ?? 0;  // onbetaald
+    const paid  = paidSum.get(u.id) ?? 0; // som payments
     const balance = total - paid;
     return { id: u.id, name: u.name, WIcreations: !!u.WIcreations, total, count, paid, balance };
   });
-
-  console.log('[metrics] totals sample:', rowsOut.slice(0,3));
 
   rowsOut.sort((a, b) => {
     if (a.WIcreations !== b.WIcreations) return a.WIcreations ? -1 : 1;
@@ -54,7 +52,9 @@ export async function fetchUserMetrics(supabase) {
 export async function fetchUserBalances(supabase) {
   const metrics = await fetchUserMetrics(supabase);
   const rows = (metrics || []).map(m => ({
-    id: m.id, name: m.name, WIcreations: !!m.WIcreations,
+    id: m.id,
+    name: m.name,
+    WIcreations: !!m.WIcreations,
     balance: Math.max(0, toNumber(m.balance)),
   }));
   rows.sort((a, b) => {
@@ -67,11 +67,13 @@ export async function fetchUserBalances(supabase) {
 export async function fetchUserDrinkPivot(supabase) {
   const { data: rows, error } = await supabase
     .from('drinks')
-    .select('user_id, users(name), products(name)');
+    .select('user_id, users(name), products(name)')
+    .or('paid.eq.false,paid.is.null'); // alleen onbetaalde drinks
   if (error) throw error;
 
   const usersMap = new Map();
   const productSet = new Set();
+
   for (const r of (rows || [])) {
     const user = r?.users?.name || 'Onbekend';
     const prod = r?.products?.name || 'Onbekend';
@@ -84,6 +86,7 @@ export async function fetchUserDrinkPivot(supabase) {
   const coll = new Intl.Collator('nl', { sensitivity: 'base', numeric: true });
   const products = Array.from(productSet).sort(coll.compare);
   const users = Array.from(usersMap.keys()).sort(coll.compare);
+
   const out = users.map(u => ({ user: u, counts: products.map(p => usersMap.get(u).get(p) || 0) }));
   return { products, rows: out };
 }
@@ -107,4 +110,7 @@ export async function fetchUserTotalsCurrentPrice(supabase) {
   return rows;
 }
 
-function toNumber(x) { const n = Number(x); return Number.isFinite(n) ? n : 0; }
+function toNumber(x) {
+  const n = Number(x);
+  return Number.isFinite(n) ? n : 0;
+}
