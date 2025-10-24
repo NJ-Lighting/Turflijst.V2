@@ -22,21 +22,29 @@
 
   <div class="content-wrapper">
     <h1>💰 Finance Overzicht</h1>
-    <!-- KPI’s -->
+
+    <!-- KPI’s (snapshot + extra’s) -->
     <section class="cards grid">
       <div class="card kpi"><div class="lbl">Koelkastwaarde</div><div id="kpi-fridge" class="val">€0,00</div></div>
       <div class="card kpi"><div class="lbl">Voorgeschoten</div><div id="kpi-prepaid" class="val">€0,00</div></div>
       <div class="card kpi"><div class="lbl">Ontvangen</div><div id="kpi-received" class="val">€0,00</div></div>
       <div class="card kpi"><div class="lbl">Statiegeld ontvangen</div><div id="kpi-deposit-earned" class="val">€0,00</div></div>
       <div class="card kpi"><div class="lbl">Profit/Loss</div><div id="kpi-profit" class="val">€0,00</div></div>
+
+      <div class="card kpi"><div class="lbl">Openstaand</div><div id="kpi-open" class="val">€0,00</div></div>
+      <div class="card kpi"><div class="lbl">Omzet (all time)</div><div id="kpi-revenue" class="val">€0,00</div></div>
+      <div class="card kpi"><div class="lbl">COGS (all time)</div><div id="kpi-cogs" class="val">€0,00</div></div>
+      <div class="card kpi"><div class="lbl">Marge (all time)</div><div id="kpi-margin" class="val">€0,00</div></div>
     </section>
+
     <!-- Buffer -->
     <section class="cards grid">
       <div class="card kpi"><div class="lbl">Buffer in</div><div id="kpi-buffer-in" class="val">€0,00</div></div>
       <div class="card kpi"><div class="lbl">Buffer uit</div><div id="kpi-buffer-out" class="val">€0,00</div></div>
       <div class="card kpi"><div class="lbl">Buffer beschikbaar</div><div id="kpi-buffer-available" class="val">€0,00</div></div>
     </section>
-    <!-- Deposits -->
+
+    <!-- Statiegeld registreren -->
     <section class="card section">
       <h2>🏦 Statiegeld registreren</h2>
       <div class="row">
@@ -45,6 +53,7 @@
         <button id="btn-add-deposit" class="btn">Opslaan</button>
       </div>
     </section>
+
     <!-- Verkocht per product -->
     <section class="card section">
       <h2>📦 Verkocht per product</h2>
@@ -53,6 +62,7 @@
         <tbody id="tbl-sold-per-product"></tbody>
       </table>
     </section>
+
     <!-- Betalingen -->
     <section class="card section">
       <h2>💸 Betalingen</h2>
@@ -79,14 +89,40 @@
         <button id="btn-add-payment" class="btn">Betaling toevoegen</button>
       </div>
     </section>
-    <!-- (optioneel) Maandoverzicht -->
+
+    <!-- Openstaand per gebruiker -->
+    <section class="card section">
+      <h2>🧾 Openstaand per gebruiker</h2>
+      <table class="table">
+        <thead><tr><th>Gebruiker</th><th class="right">Aantal</th><th class="right">Bedrag</th></tr></thead>
+        <tbody id="tbl-open-users"></tbody>
+      </table>
+    </section>
+
+    <!-- Aging -->
+    <section class="card section">
+      <h2>⏳ Aging (onbetaald)</h2>
+      <table class="table">
+        <thead><tr><th>Bucket</th><th class="right">Bedrag</th></tr></thead>
+        <tbody id="tbl-aging"></tbody>
+      </table>
+    </section>
+
+    <!-- Maandoverzicht -->
     <section class="card section">
       <h2>📅 Maandoverzicht</h2>
       <table class="table">
         <thead>
-          <tr><th>Maand</th><th class="right">Verkopen</th><th class="right">Betalingen</th><th class="right">Deposits</th></tr>
+          <tr>
+            <th>Maand</th>
+            <th class="right">Omzet</th>
+            <th class="right">COGS</th>
+            <th class="right">Marge</th>
+            <th class="right">Betalingen</th>
+            <th class="right">Deposits</th>
+          </tr>
         </thead>
-        <tbody id="month-stats"><tr><td colspan="4" class="muted">Wordt gevuld als data aanwezig is</td></tr></tbody>
+        <tbody id="month-stats"><tr><td colspan="6" class="muted">Wordt gevuld als data aanwezig is</td></tr></tbody>
       </table>
     </section>
   </div>

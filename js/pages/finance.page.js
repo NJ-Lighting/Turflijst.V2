@@ -5,9 +5,12 @@ import {
   loadSoldPerProduct,
   loadPayments,
   addPayment,
+  deletePayment,
   addDeposit,
+  loadDepositMetrics,
   loadMonthlyStats,
-  deletePayment
+  loadOpenPerUser,
+  loadAging
 } from '../api/finance.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -17,38 +20,45 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadKPIs(),
     loadSoldPerProduct(),
     loadPayments(),
+    loadOpenPerUser(),
+    loadAging(),
     loadMonthlyStats('#month-stats'),
   ]);
 
   // Betaling toevoegen
-  $('#btn-add-payment')?.addEventListener('click', () =>
-    addPayment('#pay-user', '#pay-amount', '#p-note', async () => {
+  $('#btn-add-payment')?.addEventListener('click', async () => {
+    await addPayment('#pay-user', '#pay-amount', '#p-note', async () => {
       await loadPayments();
       await loadKPIs();
-      await loadMonthlyStats('#month-stats');
-    })
-  );
-
-  // Statiegeld opslaan (buffer in)
-  $('#btn-add-deposit')?.addEventListener('click', () =>
-    addDeposit('#deposit-amount', '#deposit-note', async () => {
-      await loadKPIs();
-      await loadMonthlyStats('#month-stats');
-    })
-  );
-
-  // Filter wissel
-  $('#filter-user')?.addEventListener('change', () => loadPayments());
-
-  // Verwijderen via event delegation
-  $('#tbl-payments')?.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-del-id]');
-    if (!btn) return;
-    const id = btn.getAttribute('data-del-id');
-    deletePayment(id, async () => {
-      await loadPayments();
-      await loadKPIs();
+      await loadOpenPerUser();
+      await loadAging();
       await loadMonthlyStats('#month-stats');
     });
   });
+
+  // Statiegeld opslaan (buffer in)
+  $('#btn-add-deposit')?.addEventListener('click', async () => {
+    await addDeposit('#deposit-amount', '#deposit-note', async () => {
+      await loadKPIs();
+      await loadMonthlyStats('#month-stats');
+      if (typeof loadDepositMetrics === 'function') await loadDepositMetrics();
+    });
+  });
+
+  // Filter wissel
+  $('#filter-user')?.addEventListener('change', async () => {
+    await loadPayments();
+  });
+
+  // Globale delete (voor inline onclick)
+  window.deletePayment = async (id) => {
+    await deletePayment(id, async () => {
+      await loadPayments();
+      await loadKPIs();
+      await loadOpenPerUser();
+      await loadAging();
+      await loadMonthlyStats('#month-stats');
+      if (typeof loadDepositMetrics === 'function') await loadDepositMetrics();
+    });
+  };
 });

@@ -1,7 +1,6 @@
 // /js/api/finance.js
 import { $, euro, esc, formatDate, toast } from '../core.js';
 import { supabase } from '../supabase.client.js';
-import { fetchUserMetrics } from './metrics.js';
 
 /* ---------- Selects ---------- */
 export async function loadUsersToSelects(selFilter = '#filter-user', selPay = '#pay-user'){
@@ -24,17 +23,13 @@ export async function loadUsersToSelects(selFilter = '#filter-user', selPay = '#
 
 /* ---------- KPI's ---------- */
 export async function loadKPIs(){
-  // Onbetaald (consumptie) primair via metrics; fallback op drinks->price
-  let unpaid = 0;
-  try {
-    const metrics = await fetchUserMetrics(supabase); // [{total, paid, balance, ...}]
-    unpaid = (metrics || []).reduce((s, m) => s + Number(m.total || 0), 0);
-  } catch (e) {
-    console.warn('metrics fallback voor unpaid:', e);
-    const { data: d } = await supabase
-      .from('drinks').select('products(price)').returns(Array);
-    unpaid = (d||[]).reduce((sum, row) => sum + (row?.products?.price || 0), 0);
-  }
+  // Openstaand = som onbetaalde drinks (historische kostprijs)
+  const { data: unpaidRows } = await supabase
+    .from('drinks')
+    .select('price_at_purchase, paid')
+    .or('paid.eq.false,paid.is.null');
+  const unpaid = (unpaidRows||[])
+    .reduce((s,r)=> s + Number(r.price_at_purchase||0), 0);
 
   // Voorraadwaarde (actueel)
   const { data: sb } = await supabase
@@ -50,7 +45,7 @@ export async function loadKPIs(){
   const { data: deps } = await supabase.from('deposits').select('amount');
   const depositIn = (deps||[]).reduce((s,p)=> s + Number(p.amount||0), 0);
 
-  // Buffer OUT gelogd op batches (kolom 'buffer_used' indien aanwezig)
+  // Buffer OUT (optioneel, als je kolom gebruikt)
   let bufferOut = 0;
   try {
     const { data: sb2 } = await supabase
@@ -59,7 +54,17 @@ export async function loadKPIs(){
   } catch{}
 
   const bufferAvailable = Math.max(0, depositIn - bufferOut);
-  const prepaid = fridge + unpaid;                 // Totale voorgeschoten
+  const prepaid = fridge + unpaid;                 // Totale voorgeschoten (huidige voorraad + openstaand)
+
+  // Omzet, COGS, Marge (cumulatief)
+  const { data: salesRows } = await supabase
+    .from('drinks')
+    .select('sell_price_at_purchase, price_at_purchase');
+  const revenue = (salesRows||[]).reduce((s,r)=> s + Number(r.sell_price_at_purchase||0), 0);
+  const cogs    = (salesRows||[]).reduce((s,r)=> s + Number(r.price_at_purchase||0), 0);
+  const margin  = revenue - cogs;
+
+  // Profit (zoals eerder gedefinieerd: cash-resultaat)
   const profit  = (received + depositIn) - prepaid;
 
   // Render
@@ -70,13 +75,19 @@ export async function loadKPIs(){
   set('#kpi-deposit-earned', depositIn);
   set('#kpi-profit', profit);
 
+  // nieuwe KPI’s
+  set('#kpi-open', unpaid);
+  set('#kpi-revenue', revenue);
+  set('#kpi-cogs', cogs);
+  set('#kpi-margin', margin);
+
   // Buffer-blok
   set('#kpi-buffer-in', depositIn);
   set('#kpi-buffer-out', bufferOut);
   set('#kpi-buffer-available', bufferAvailable);
 }
 
-/* ---------- Verkochte blikjes per product ---------- */
+/* ---------- Verkochte stuks per product ---------- */
 export async function loadSoldPerProduct(){
   const { data, error } = await supabase
     .from('drinks').select('products(name)').returns(Array);
@@ -118,7 +129,7 @@ export async function loadPayments(selRows = '#tbl-payments', selFilterUser = '#
         <td>${esc(user)}</td>
         <td class="right">${euro(p.amount||0)}</td>
         <td>${esc(note)}</td>
-        <td><button class="btn delete-btn" data-del-id="${esc(p.id)}">Verwijderen</button></td>
+        <td><button class="btn delete-btn" onclick="deletePayment('${esc(p.id)}')">Verwijderen</button></td>
       </tr>
     `;
   }).join('');
@@ -179,16 +190,19 @@ export async function loadDepositMetrics(){
   await loadKPIs();
 }
 
-/* ---------- Maand-statistiek (optioneel) ---------- */
+/* ---------- Maand-statistiek ---------- */
 export async function loadMonthlyStats(selContainer='#month-stats'){
   if (!$(selContainer)) return; // alleen draaien als er UI voor is
 
-  // drinks per maand
+  // drinks per maand (omzet & cogs)
   const { data: drinks } = await supabase
-    .from('drinks').select('created_at, products(price)');
+    .from('drinks')
+    .select('created_at, sell_price_at_purchase, price_at_purchase');
+
   // payments per maand
   const { data: pays } = await supabase
     .from('payments').select('created_at, amount');
+
   // deposits per maand
   const { data: deps } = await supabase
     .from('deposits').select('created_at, amount');
@@ -201,17 +215,21 @@ export async function loadMonthlyStats(selContainer='#month-stats'){
   const sums = {};
   (drinks||[]).forEach(d => {
     const k = monthKey(d.created_at);
-    sums[k] = sums[k] || { sales:0, payments:0, deposits:0 };
-    sums[k].sales += (d.products?.price || 0);
+    sums[k] = sums[k] || { revenue:0, cogs:0, margin:0, payments:0, deposits:0 };
+    sums[k].revenue += Number(d.sell_price_at_purchase || 0);
+    sums[k].cogs    += Number(d.price_at_purchase || 0);
+    sums[k].margin   = sums[k].revenue - sums[k].cogs;
   });
+
   (pays||[]).forEach(p => {
     const k = monthKey(p.created_at);
-    sums[k] = sums[k] || { sales:0, payments:0, deposits:0 };
+    sums[k] = sums[k] || { revenue:0, cogs:0, margin:0, payments:0, deposits:0 };
     sums[k].payments += Number(p.amount||0);
   });
+
   (deps||[]).forEach(dp => {
     const k = monthKey(dp.created_at);
-    sums[k] = sums[k] || { sales:0, payments:0, deposits:0 };
+    sums[k] = sums[k] || { revenue:0, cogs:0, margin:0, payments:0, deposits:0 };
     sums[k].deposits += Number(dp.amount||0);
   });
 
@@ -220,11 +238,63 @@ export async function loadMonthlyStats(selContainer='#month-stats'){
     .map(([m, v]) => `
       <tr>
         <td>${esc(m)}</td>
-        <td class="right">${euro(v.sales)}</td>
+        <td class="right">${euro(v.revenue)}</td>
+        <td class="right">${euro(v.cogs)}</td>
+        <td class="right">${euro(v.margin)}</td>
         <td class="right">${euro(v.payments)}</td>
         <td class="right">${euro(v.deposits)}</td>
       </tr>
     `).join('');
 
   $(selContainer).innerHTML = rows;
+}
+
+/* ---------- Transparantie-tabellen ---------- */
+export async function loadOpenPerUser(sel='#tbl-open-users'){
+  const { data, error } = await supabase
+    .from('drinks')
+    .select('user_id, users(name), price_at_purchase, paid')
+    .or('paid.eq.false,paid.is.null');
+  if (error) { console.error(error); return; }
+
+  const map = new Map(); // name -> {amount, count}
+  (data||[]).forEach(r => {
+    const name = r?.users?.name || 'Onbekend';
+    const amt  = Number(r?.price_at_purchase || 0);
+    const agg  = map.get(name) || { amount:0, count:0 };
+    agg.amount += amt; agg.count += 1;
+    map.set(name, agg);
+  });
+
+  const rows = Array.from(map.entries())
+    .sort((a,b)=> a[0].localeCompare(b[0], 'nl', {sensitivity:'base'}))
+    .map(([name, v]) =>
+      `<tr><td>${esc(name)}</td><td class="right">${v.count}</td><td class="right">${euro(v.amount)}</td></tr>`)
+    .join('');
+
+  if ($(sel)) $(sel).innerHTML = rows;
+}
+
+export async function loadAging(sel='#tbl-aging'){
+  const { data, error } = await supabase
+    .from('drinks')
+    .select('created_at, price_at_purchase, paid')
+    .or('paid.eq.false,paid.is.null');
+  if (error) { console.error(error); return; }
+
+  const now = Date.now();
+  const buckets = { '0–30 dagen':0, '31–60 dagen':0, '61+ dagen':0 };
+  (data||[]).forEach(r => {
+    const ageDays = Math.floor((now - new Date(r.created_at).getTime()) / 86400000);
+    const v = Number(r.price_at_purchase||0);
+    if (ageDays <= 30) buckets['0–30 dagen'] += v;
+    else if (ageDays <= 60) buckets['31–60 dagen'] += v;
+    else buckets['61+ dagen'] += v;
+  });
+
+  const rows = Object.entries(buckets)
+    .map(([label, amt]) => `<tr><td>${esc(label)}</td><td class="right">${euro(amt)}</td></tr>`)
+    .join('');
+
+  if ($(sel)) $(sel).innerHTML = rows;
 }

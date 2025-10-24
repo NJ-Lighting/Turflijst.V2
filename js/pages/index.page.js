@@ -51,7 +51,7 @@ async function loadUsers() {
     return coll.compare(a.name, b.name);
   });
 
-  // Maak echte <option>-regels met value="id"
+  // Echte <option>-regels met value="id"
   const parts = [
     '<option value="">-- Kies gebruiker --</option>'
   ];
@@ -103,7 +103,7 @@ ${euro(p.price)}
         if (btn.disabled) return;
         btn.disabled = true;
         try {
-          await logDrink(p.id);
+          await logDrink(p.id, p.price); // verkoopprijs meegeven
         } finally {
           btn.disabled = false;
         }
@@ -113,7 +113,7 @@ ${euro(p.price)}
     });
 }
 
-window.logDrink = async (productId) => {
+window.logDrink = async (productId, sellPrice) => {
   const now = Date.now();
   if (isLogging || (now - lastLogAt) < THROTTLE_MS) return;
   lastLogAt = now;
@@ -143,12 +143,13 @@ window.logDrink = async (productId) => {
     return toast('❌ Geen voorraad meer voor dit product');
   }
 
-  // 2) Drink wegschrijven met vaste batch-prijs
+  // 2) Drink wegschrijven met vaste batch-prijs + verkoopprijs vastklikken
   {
     const { error: dErr } = await supabase.from('drinks').insert([{
       user_id: userId,
       product_id: productId,
       price_at_purchase: oldest.price_per_piece,
+      sell_price_at_purchase: sellPrice ?? oldest.price_per_piece,
       batch_id: oldest.id
     }]);
     if (dErr) {
