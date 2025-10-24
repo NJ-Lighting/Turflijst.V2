@@ -9,10 +9,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function addUser() {
   // v1-stijl: probeer first/last te lezen; anders gebruik #nu-name
-  const first = $('#nu-first')?.value?.trim() || '';
-  const last  = $('#nu-last')?.value?.trim()  || '';
-  const single = $('#nu-name')?.value?.trim() || '';
-
+  const first  = $('#nu-first')?.value?.trim() || '';
+  const last   = $('#nu-last')?.value?.trim()  || '';
+  const single = $('#nu-name')?.value?.trim()  || '';
   const fullName = (first || last) ? `${first} ${last}`.trim() : single;
   if (!fullName || fullName.length < 2) return toast('⚠️ Vul een geldige naam in');
 
@@ -32,10 +31,10 @@ async function addUser() {
   toast('✅ Gebruiker toegevoegd');
 
   // Formulier legen indien aanwezig
-  if ($('#nu-first')) $('#nu-first').value = '';
-  if ($('#nu-last'))  $('#nu-last').value  = '';
-  if ($('#nu-name'))  $('#nu-name').value  = '';
-  if ($('#nu-phone')) $('#nu-phone').value = '';
+  if ($('#nu-first'))  $('#nu-first').value  = '';
+  if ($('#nu-last'))   $('#nu-last').value   = '';
+  if ($('#nu-name'))   $('#nu-name').value   = '';
+  if ($('#nu-phone'))  $('#nu-phone').value  = '';
   if ($('#nu-avatar')) $('#nu-avatar').value = '';
 
   // (v1-flow) terug naar hoofdpagina
@@ -55,7 +54,6 @@ async function loadRecentUsers() {
     console.error(error);
     return;
   }
-
   if (!$('#nu-recent')) return;
 
   $('#nu-recent').innerHTML = (users || [])
