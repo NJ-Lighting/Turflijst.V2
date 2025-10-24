@@ -9,15 +9,17 @@ export async function loadUsersToSelects(selFilter = '#filter-user', selPay = '#
     .from('users').select('id, name').order('name', { ascending: true });
   if(error){ console.error(error); return; }
 
-  const optsAll  = ['<option value="">— Alle gebruikers —</option>']
-    .concat((users||[]).map(u => `<option value="${u.id}">${esc(u.name)}</option>`))
-    .join('');
-  const optsPick = ['<option value="">— Kies gebruiker —</option>']
-    .concat((users||[]).map(u => `<option value="${u.id}">${esc(u.name)}</option>`))
-    .join('');
+  const optsAll = [
+    '<option value="">— Alle gebruikers —</option>',
+    ...(users||[]).map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`)
+  ].join('');
+  const optsPick = [
+    '<option value="">— Kies gebruiker —</option>',
+    ...(users||[]).map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`)
+  ].join('');
 
   if (selFilter && $(selFilter)) $(selFilter).innerHTML = optsAll;
-  if (selPay && $(selPay))       $(selPay).innerHTML    = optsPick;
+  if (selPay && $(selPay)) $(selPay).innerHTML = optsPick;
 }
 
 /* ---------- KPI's ---------- */
@@ -55,18 +57,19 @@ export async function loadKPIs(){
       .from('stock_batches').select('buffer_used').gt('buffer_used', 0);
     bufferOut = (sb2||[]).reduce((s,b)=> s + Number(b.buffer_used||0), 0);
   } catch{}
-  const bufferAvailable = Math.max(0, depositIn - bufferOut);
 
-  const prepaid = fridge + unpaid;             // Totale voorgeschoten
+  const bufferAvailable = Math.max(0, depositIn - bufferOut);
+  const prepaid = fridge + unpaid;                 // Totale voorgeschoten
   const profit  = (received + depositIn) - prepaid;
 
-  // Render (alle zijn optioneel; render alleen als element bestaat)
+  // Render
   const set = (sel, val) => { if($(sel)) $(sel).textContent = euro(val); };
   set('#kpi-fridge', fridge);
   set('#kpi-prepaid', prepaid);
   set('#kpi-received', received);
   set('#kpi-deposit-earned', depositIn);
   set('#kpi-profit', profit);
+
   // Buffer-blok
   set('#kpi-buffer-in', depositIn);
   set('#kpi-buffer-out', bufferOut);
@@ -87,7 +90,7 @@ export async function loadSoldPerProduct(){
 
   const rows = Object.entries(counts)
     .sort((a,b)=> a[0].localeCompare(b[0]))
-    .map(([name, n]) => `<tr><td>${esc(name)}</td><td>${n}</td></tr>`)
+    .map(([name, n]) => `<tr><td>${esc(name)}</td><td class="right">${n}</td></tr>`)
     .join('');
 
   if ($('#tbl-sold-per-product')) $('#tbl-sold-per-product').innerHTML = rows;
@@ -96,11 +99,9 @@ export async function loadSoldPerProduct(){
 /* ---------- Betalingen ---------- */
 export async function loadPayments(selRows = '#tbl-payments', selFilterUser = '#filter-user'){
   const userId = $(selFilterUser)?.value;
-
   let query = supabase
     .from('payments')
     .select('id, amount, note, created_at, users(name)');
-
   if (userId) query = query.eq('user_id', userId);
   query = query.order('created_at', { ascending:false }).limit(300);
 
@@ -111,23 +112,24 @@ export async function loadPayments(selRows = '#tbl-payments', selFilterUser = '#
     const dt   = formatDate(p.created_at);
     const user = p?.users?.name || 'Onbekend';
     const note = p?.note || '—';
-    return `<tr>
-      <td>${esc(dt)}</td>
-      <td>${esc(user)}</td>
-      <td>${euro(p.amount||0)}</td>
-      <td>${esc(note)}</td>
-      <td><button onclick="deletePayment(${p.id})">Verwijderen</button></td>
-    </tr>`;
+    return `
+      <tr>
+        <td>${esc(dt)}</td>
+        <td>${esc(user)}</td>
+        <td class="right">${euro(p.amount||0)}</td>
+        <td>${esc(note)}</td>
+        <td><button class="btn delete-btn" data-del-id="${esc(p.id)}">Verwijderen</button></td>
+      </tr>
+    `;
   }).join('');
 
   if ($(selRows)) $(selRows).innerHTML = rows;
 }
 
 export async function addPayment(selUser='#pay-user', selAmount='#pay-amount', selNote='#p-note', after=()=>{}){
-  const userId    = $(selUser)?.value;
+  const userId = $(selUser)?.value;
   const amountStr = $(selAmount)?.value?.trim() || '';
-  const note      = $(selNote)?.value?.trim() || '';
-
+  const note = $(selNote)?.value?.trim() || '';
   if(!userId) return toast('⚠️ Kies eerst een gebruiker');
   const amount = parseFloat(amountStr.replace(',', '.'));
   if(!(amount > 0)) return toast('⚠️ Vul een geldig bedrag in');
@@ -141,7 +143,7 @@ export async function addPayment(selUser='#pay-user', selAmount='#pay-amount', s
 
   toast('✅ Betaling geregistreerd');
   if($(selAmount)) $(selAmount).value = '';
-  if($(selNote))   $(selNote).value   = '';
+  if($(selNote)) $(selNote).value = '';
   await after();
 }
 
@@ -156,8 +158,8 @@ export async function deletePayment(id, after=()=>{}){
 /* ---------- Deposits / Buffer ---------- */
 export async function addDeposit(selAmount='#deposit-amount', selNote='#deposit-note', after=()=>{}){
   const amountStr = $(selAmount)?.value?.trim() || '';
-  const note      = $(selNote)?.value?.trim() || '';
-  const amount    = parseFloat(amountStr.replace(',', '.'));
+  const note = $(selNote)?.value?.trim() || '';
+  const amount = parseFloat(amountStr.replace(',', '.'));
   if(!(amount > 0)) return toast('⚠️ Vul een geldig statiegeld-bedrag in');
 
   const payload = { amount };
@@ -168,7 +170,7 @@ export async function addDeposit(selAmount='#deposit-amount', selNote='#deposit-
 
   toast('✅ Statiegeld geregistreerd');
   if($(selAmount)) $(selAmount).value = '';
-  if($(selNote))   $(selNote).value   = '';
+  if($(selNote)) $(selNote).value = '';
   await after();
 }
 
@@ -215,12 +217,14 @@ export async function loadMonthlyStats(selContainer='#month-stats'){
 
   const rows = Object.entries(sums)
     .sort((a,b)=> a[0].localeCompare(b[0]))
-    .map(([m, v]) => `<tr>
-      <td>${esc(m)}</td>
-      <td>${euro(v.sales)}</td>
-      <td>${euro(v.payments)}</td>
-      <td>${euro(v.deposits)}</td>
-    </tr>`).join('');
+    .map(([m, v]) => `
+      <tr>
+        <td>${esc(m)}</td>
+        <td class="right">${euro(v.sales)}</td>
+        <td class="right">${euro(v.payments)}</td>
+        <td class="right">${euro(v.deposits)}</td>
+      </tr>
+    `).join('');
 
   $(selContainer).innerHTML = rows;
 }
