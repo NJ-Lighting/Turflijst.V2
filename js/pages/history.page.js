@@ -13,12 +13,10 @@ async function loadUsers() {
     .from('users')
     .select('id, name')
     .order('name', { ascending: true });
-
   if (error) {
     console.error(error);
     return;
   }
-
   const opts = [
     '<option value="">— Alle gebruikers —</option>',
     ...(users || []).map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`)
@@ -36,7 +34,7 @@ function setDefaultDates() {
 export async function loadHistory() {
   const userId = $('#h-user')?.value || '';
   const from = $('#h-from')?.value ? new Date($('#h-from').value) : null;
-  const to = $('#h-to')?.value ? new Date($('#h-to').value) : null;
+  const to   = $('#h-to')?.value ? new Date($('#h-to').value)   : null;
 
   let query = supabase
     .from('drinks')
@@ -59,15 +57,15 @@ export async function loadHistory() {
     .filter(r => {
       const t = new Date(r.created_at);
       const inFrom = from ? t >= truncDay(from) : true;
-      const inTo = to ? t <= endOfDay(to) : true;
+      const inTo   = to   ? t <= endOfDay(to)   : true;
       return inFrom && inTo;
     })
     .forEach(r => {
-      const dt = new Date(r.created_at).toLocaleString?.('nl-NL') || new Date(r.created_at).toISOString();
-      const user = r?.users?.name || 'Onbekend';
-      const prod = r?.products?.name || '—';
+      const dt    = new Date(r.created_at).toLocaleString?.('nl-NL') || new Date(r.created_at).toISOString();
+      const user  = r?.users?.name || 'Onbekend';
+      const prod  = r?.products?.name || '—';
       const price = r?.products?.price || 0;
-      const paid = r?.paid
+      const paid  = r?.paid
         ? '<span class="paid-yes">✔</span>'
         : '<span class="paid-no">✖</span>';
 
@@ -84,10 +82,10 @@ export async function loadHistory() {
     });
 
   if ($('#h-rows')) $('#h-rows').innerHTML = rows.join('');
-  if ($('#h-sum')) $('#h-sum').textContent = euro(sum);
+  if ($('#h-sum'))  $('#h-sum').textContent = euro(sum);
 }
 
 // local utils
-function truncDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
-function endOfDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
-function toDateInput(d) { return d.toISOString().slice(0, 10); }
+function truncDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+function endOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
+function toDateInput(d){ return d.toISOString().slice(0,10); }
