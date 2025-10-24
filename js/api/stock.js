@@ -5,7 +5,7 @@ import { supabase } from '../supabase.client.js';
 export const DEPOSIT_MAP = { petfles: 0.25, glas: 0.10, blikje: 0.15 };
 
 /* ---------------------------
- *  Publieke helpers voor Index
+ * Publieke helpers voor Index
  * --------------------------- */
 
 // Haal producten op + totale voorraad (som van batches)
@@ -44,7 +44,10 @@ export async function fifoConsume(productId, qty = 1, sb = supabase) {
     .order('created_at', { ascending: true })
     .order('id', { ascending: true });
 
-  if (error) { console.error(error); return false; }
+  if (error) {
+    console.error(error);
+    return false;
+  }
 
   for (const b of (batches || [])) {
     if (remaining <= 0) break;
@@ -55,7 +58,11 @@ export async function fifoConsume(productId, qty = 1, sb = supabase) {
       .from('stock_batches')
       .update({ quantity: b.quantity - take })
       .eq('id', b.id);
-    if (updErr) { console.error(updErr); return false; }
+
+    if (updErr) {
+      console.error(updErr);
+      return false;
+    }
 
     remaining -= take;
   }
@@ -76,7 +83,10 @@ export async function fifoUnconsume(productId, qty = 1, sb = supabase) {
     .order('created_at', { ascending: false })
     .order('id', { ascending: false });
 
-  if (error) { console.error(error); return false; }
+  if (error) {
+    console.error(error);
+    return false;
+  }
 
   for (const b of (batches || [])) {
     if (remaining <= 0) break;
@@ -85,9 +95,13 @@ export async function fifoUnconsume(productId, qty = 1, sb = supabase) {
       .from('stock_batches')
       .update({ quantity: (Number(b.quantity) || 0) + add })
       .eq('id', b.id);
-    if (updErr) { console.error(updErr); return false; }
+    if (updErr) {
+      console.error(updErr);
+      return false;
+    }
     remaining -= add;
   }
+
   // Als er geen batches zijn, zouden we er eigenlijk één moeten maken; V1 deed dat niet → laten we het stilzwijgend negeren.
   return true;
 }
@@ -102,7 +116,11 @@ export async function syncProductPriceFromOldestBatch(productId, sb = supabase) 
     .order('created_at', { ascending: true })
     .order('id', { ascending: true });
 
-  if (error) { console.error(error); return; }
+  if (error) {
+    console.error(error);
+    return;
+  }
+
   if ((batches || []).length > 0) {
     const newPrice = Math.max(0, batches[0].price_per_piece || 0);
     await sb.from('products').update({ price: newPrice }).eq('id', productId);
@@ -110,7 +128,7 @@ export async function syncProductPriceFromOldestBatch(productId, sb = supabase) 
 }
 
 /* ---------------------------------
- *  UI helpers (Stock pagina zelf)
+ * UI helpers (Stock pagina zelf)
  * --------------------------------- */
 
 export async function loadProducts(){
@@ -118,13 +136,16 @@ export async function loadProducts(){
     .from('products')
     .select('id, name')
     .order('name', { ascending: true });
+
   if (error) {
     console.error(error);
     return toast('❌ Kon producten niet laden');
   }
-  const opts = ['— Kies product —']
-    .concat((products || []).map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`))
-    .join('');
+
+  const opts = [
+    '<option value="">— Kies product —</option>',
+    ...(products || []).map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`)
+  ].join('');
   $('#batch-product').innerHTML = opts;
 }
 
@@ -153,11 +174,12 @@ export async function addBatch(){
   const depType = $('#batch-deposit-type').value || '';
   const depVal = DEPOSIT_MAP[depType] || 0;
 
-  if (!productId) return toast('⚠️ Kies een product');
-  if (!(qty > 0)) return toast('⚠️ Vul een geldig aantal in');
+  if (!productId)  return toast('⚠️ Kies een product');
+  if (!(qty > 0))  return toast('⚠️ Vul een geldig aantal in');
   if (!(total >= 0)) return toast('⚠️ Vul een geldige totaalprijs in');
 
   const pricePerPiece = Math.max(0, (total / qty) + depVal);
+
   const payload = {
     product_id: productId,
     quantity: qty,
@@ -205,12 +227,15 @@ export async function loadActiveBatches(){
     <tr>
       <td>${esc(b.products?.name || 'Onbekend')}</td>
       <td>${esc(formatDate(b.created_at))}</td>
-      <td style="text-align:right">${b.quantity}</td>
-      <td style="text-align:right">${euro(b.price_per_piece)}</td>
+      <td class="right">${b.quantity}</td>
+      <td class="right">${euro(b.price_per_piece)}</td>
       <td>${b.deposit_type ? `${esc(b.deposit_type)} (${euro(b.deposit_value || 0)})` : '—'}</td>
-      <td><button class="link" onclick="deleteBatch(${b.id}, ${b.product_id})">Verwijderen</button></td>
+      <td>
+        <button class="btn delete-btn" onclick="deleteBatch('${esc(b.id)}','${esc(b.product_id)}')">Verwijderen</button>
+      </td>
     </tr>
   `).join('');
+
   $('#tbl-batches').innerHTML = rows;
 }
 
@@ -234,24 +259,30 @@ export async function loadStockPerProduct(){
 
   const rows = Object.values(map)
     .sort((a, b) => a.name.localeCompare(b.name))
-    .map(x => `<tr><td>${esc(x.name)}</td><td style="text-align:right">${x.qty}</td></tr>`)
+    .map(x => `<tr><td>${esc(x.name)}</td><td class="right">${x.qty}</td></tr>`)
     .join('');
+
   $('#tbl-stock-per-product').innerHTML = rows;
 }
 
 export async function deleteBatch(id, productId){
   if (!confirm('Weet je zeker dat je deze batch wilt verwijderen?')) return;
+
   const { error } = await supabase
     .from('stock_batches')
     .delete()
     .eq('id', id);
+
   if (error) {
     console.error(error);
     return toast('❌ Verwijderen mislukt');
   }
+
   toast('✅ Batch verwijderd');
   await refreshTables();
   await syncProductPriceFromOldestBatch(productId);
 }
 
-function round2(v){ return Math.round((Number(v) || 0) * 100) / 100; }
+function round2(v){
+  return Math.round((Number(v) || 0) * 100) / 100;
+}
