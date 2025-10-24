@@ -8,6 +8,12 @@
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/css/nav.css" />
+  <style>
+    /* ✅ extra stijl voor betaald/ niet-betaald */
+    .paid-cell { text-align: center; font-size: 1.2em; }
+    .paid-yes { color: #2ecc71; } /* groen */
+    .paid-no  { color: #e74c3c; } /* rood */
+  </style>
 </head>
 <body class="bg-train">
   <header class="site-nav" role="banner">
@@ -29,26 +35,38 @@
     <div>
       <label for="h-user">Gebruiker</label><br />
       <select id="h-user" class="select"></select>
+
       <label for="h-from">Vanaf</label><br />
       <input id="h-from" class="select" type="date" />
+
       <label for="h-to">Tot en met</label><br />
       <input id="h-to" class="select" type="date" />
-      <label style="display:inline-block; margin:0.5rem 0 0.5rem 0.25rem;">
-        <input type="checkbox" id="h-paid" />
-        Betaald tonen
-      </label>
+
       <button class="btn" id="h-apply">🔎 Toepassen</button>
     </div>
 
     <h2>Log</h2>
     <table class="table">
-      <thead><tr><th>Datum/Tijd</th><th>Gebruiker</th><th>Drankje</th><th>Prijs (€)</th></tr></thead>
+      <thead>
+        <tr>
+          <th>Datum/Tijd</th>
+          <th>Gebruiker</th>
+          <th>Drankje</th>
+          <th>Prijs (€)</th>
+          <th>Betaald</th>
+        </tr>
+      </thead>
       <tbody id="h-rows"></tbody>
     </table>
 
     <h2>Totaal in selectie</h2>
     <table class="table">
-      <tbody><tr><th style="width:50%">Som bedragen</th><td id="h-sum">€0,00</td></tr></tbody>
+      <tbody>
+        <tr>
+          <th style="width:50%">Som bedragen</th>
+          <td id="h-sum">€0,00</td>
+        </tr>
+      </tbody>
     </table>
   </div>
 
