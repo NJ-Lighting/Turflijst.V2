@@ -13,10 +13,8 @@ async function loadUsers() {
     .from('users')
     .select('id, name')
     .order('name', { ascending: true });
-  if (error) {
-    console.error(error);
-    return;
-  }
+  if (error) { console.error(error); return; }
+
   const opts = [
     '<option value="">— Alle gebruikers —</option>',
     ...(users || []).map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`)
@@ -38,17 +36,14 @@ export async function loadHistory() {
 
   let query = supabase
     .from('drinks')
-    .select('created_at, paid, users(name), products(name, price)')
+    .select('created_at, paid, price_at_purchase, users(name), products(name, price)')
     .order('created_at', { ascending: false })
     .limit(500);
 
   if (userId) query = query.eq('user_id', userId);
 
   const { data, error } = await query;
-  if (error) {
-    console.error(error);
-    return;
-  }
+  if (error) { console.error(error); return; }
 
   const rows = [];
   let sum = 0;
@@ -64,7 +59,7 @@ export async function loadHistory() {
       const dt    = new Date(r.created_at).toLocaleString?.('nl-NL') || new Date(r.created_at).toISOString();
       const user  = r?.users?.name || 'Onbekend';
       const prod  = r?.products?.name || '—';
-      const price = r?.products?.price || 0;
+      const price = (r?.price_at_purchase ?? r?.products?.price) || 0;
       const paid  = r?.paid
         ? '<span class="paid-yes">✔</span>'
         : '<span class="paid-no">✖</span>';
