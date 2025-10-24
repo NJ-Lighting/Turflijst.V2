@@ -1,95 +1,66 @@
-import { $, euro, esc } from '../core.js';
-import { supabase } from '../supabase.client.js';
+import { $ } from '../core.js';
+import {
+  loadUsersToSelects,
+  loadKPIs,
+  loadSoldPerProduct,
+  loadPayments,
+  addPayment,
+  addDeposit,
+  loadMonthlyStats,
+  deletePayment,
+  loadOpenPerUser,
+  loadAging
+} from '../api/finance.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await loadUsers();
-  setDefaultDates();
-  $('#h-apply')?.addEventListener('click', loadHistory);
-  await loadHistory();
-});
+  await loadUsersToSelects();
 
-async function loadUsers() {
-  const { data: users, error } = await supabase
-    .from('users')
-    .select('id, name')
-    .order('name', { ascending: true });
+  const refreshAll = async () => {
+    await Promise.all([
+      loadKPIs(),
+      loadSoldPerProduct(),
+      loadPayments(),
+      loadOpenPerUser(),
+      loadAging(),
+      loadMonthlyStats('#month-stats'),
+    ]);
+  };
 
-  if (error) {
-    console.error(error);
-    return;
-  }
+  await refreshAll();
+  $('#btn-refresh')?.addEventListener('click', refreshAll);
 
-  const opts = [
-    '<option value="">— Alle gebruikers —</option>',
-    ...(users || []).map(u => `<option value="${esc(u.id)}">${esc(u.name)}</option>`)
-  ].join('');
-
-  if ($('#h-user')) $('#h-user').innerHTML = opts;
-}
-
-function setDefaultDates() {
-  const to = new Date();
-  const from = new Date(Date.now() - 29 * 864e5);
-  if ($('#h-from')) $('#h-from').value = toDateInput(from);
-  if ($('#h-to')) $('#h-to').value = toDateInput(to);
-}
-
-export async function loadHistory() {
-  const userId = $('#h-user')?.value || '';
-  const from = $('#h-from')?.value ? new Date($('#h-from').value) : null;
-  const to   = $('#h-to')?.value ? new Date($('#h-to').value)   : null;
-
-  let query = supabase
-    .from('drinks')
-    .select('created_at, paid, price_at_purchase, users(name), products(name, price)')
-    .order('created_at', { ascending: false })
-    .limit(500);
-
-  if (userId) query = query.eq('user_id', userId);
-
-  const { data, error } = await query;
-  if (error) {
-    console.error(error);
-    return;
-  }
-
-  const rows = [];
-  let sum = 0;
-
-  (data || [])
-    .filter(r => {
-      const t = new Date(r.created_at);
-      const inFrom = from ? t >= truncDay(from) : true;
-      const inTo   = to   ? t <= endOfDay(to)   : true;
-      return inFrom && inTo;
+  // Betaling toevoegen
+  $('#btn-add-payment')?.addEventListener('click', () =>
+    addPayment('#pay-user', '#pay-amount', '#p-note', async () => {
+      await loadPayments();
+      await loadKPIs();
+      await loadOpenPerUser();
+      await loadAging();
+      await loadMonthlyStats('#month-stats');
     })
-    .forEach(r => {
-      const dt    = new Date(r.created_at).toLocaleString?.('nl-NL') || new Date(r.created_at).toISOString();
-      const user  = r?.users?.name || 'Onbekend';
-      const prod  = r?.products?.name || '—';
-      const price = r?.price_at_purchase || 0; // historische prijs
-      const paid  = r?.paid
-        ? '<span class="paid-yes">✔</span>'
-        : '<span class="paid-no">✖</span>';
+  );
 
-      sum += price;
+  // Statiegeld opslaan (buffer in)
+  $('#btn-add-deposit')?.addEventListener('click', () =>
+    addDeposit('#deposit-amount', '#deposit-note', async () => {
+      await loadKPIs();
+      await loadOpenPerUser();
+      await loadAging();
+      await loadMonthlyStats('#month-stats');
+    })
+  );
 
-      rows.push(
-        `<tr>
-           <td>${esc(dt)}</td>
-           <td>${esc(user)}</td>
-           <td>${esc(prod)}</td>
-           <td class="num">${euro(price)}</td>
-           <td class="paid-cell">${paid}</td>
-         </tr>`
-      );
+  // Filter wissel
+  $('#filter-user')?.addEventListener('change', () => loadPayments());
+
+  // Verwijderen (werkt met inline onclick uit api/finance.js)
+  window.deletePayment = async (id) => {
+    await deletePayment(id, async () => {
+      await loadPayments();
+      await loadKPIs();
+      await loadOpenPerUser();
+      await loadAging();
+      await loadMonthlyStats('#month-stats');
     });
-
-  if ($('#h-rows')) $('#h-rows').innerHTML = rows.join('');
-  if ($('#h-sum'))  $('#h-sum').textContent = euro(sum);
-}
-
-// local utils
-function truncDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
-function endOfDay(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
-function toDateInput(d){ return d.toISOString().slice(0,10); }
+  };
+});
