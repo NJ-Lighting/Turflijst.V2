@@ -319,9 +319,3 @@ export async function loadAging(sel='#tbl-aging'){
 
   if ($(sel)) $(sel).innerHTML = rows || '<tr><td colspan="2" class="muted">Geen data</td></tr>';
 }
-
-/* ---------- Helpers ---------- */
-function formatDate(iso) {
-  const d = new Date(iso);
-  return d.toLocaleString('nl-NL');
-}
