@@ -1,4 +1,3 @@
-// /js/api/finance.js
 import { $, euro, esc, formatDate, toast } from '../core.js';
 import { supabase } from '../supabase.client.js';
 
@@ -64,7 +63,7 @@ export async function loadKPIs(){
   const cogs    = (salesRows||[]).reduce((s,r)=> s + Number(r.price_at_purchase||0), 0);
   const margin  = revenue - cogs;
 
-  // Profit (zoals eerder gedefinieerd: cash-resultaat)
+  // Profit (cash-achtig, zoals eerder)
   const profit  = (received + depositIn) - prepaid;
 
   // Render
@@ -109,32 +108,54 @@ export async function loadSoldPerProduct(){
 
 /* ---------- Betalingen ---------- */
 export async function loadPayments(selRows = '#tbl-payments', selFilterUser = '#filter-user'){
-  const userId = $(selFilterUser)?.value;
-  let query = supabase
-    .from('payments')
-    .select('id, amount, note, created_at, users(name)');
-  if (userId) query = query.eq('user_id', userId);
-  query = query.order('created_at', { ascending:false }).limit(300);
+  try {
+    const userId = $(selFilterUser)?.value || '';
 
-  const { data, error } = await query;
-  if(error){ console.error(error); return; }
+    // 1) Haal betalingen op (zonder join)
+    let q = supabase
+      .from('payments')
+      .select('id, user_id, amount, note, created_at');
+    if (userId) q = q.eq('user_id', userId);
+    q = q.order('created_at', { ascending: false }).limit(300);
 
-  const rows = (data||[]).map(p => {
-    const dt   = formatDate(p.created_at);
-    const user = p?.users?.name || 'Onbekend';
-    const note = p?.note || '—';
-    return `
-      <tr>
-        <td>${esc(dt)}</td>
-        <td>${esc(user)}</td>
-        <td class="right">${euro(p.amount||0)}</td>
-        <td>${esc(note)}</td>
-        <td><button class="btn delete-btn" onclick="deletePayment('${esc(p.id)}')">Verwijderen</button></td>
-      </tr>
-    `;
-  }).join('');
+    const { data: pays, error: pErr } = await q;
+    if (pErr) { console.error(pErr); return; }
 
-  if ($(selRows)) $(selRows).innerHTML = rows;
+    // 2) Maak user map (id -> name) in één keer
+    const userIds = Array.from(new Set((pays || []).map(p => p.user_id).filter(Boolean)));
+    let nameById = new Map();
+    if (userIds.length) {
+      const { data: users, error: uErr } = await supabase
+        .from('users')
+        .select('id, name')
+        .in('id', userIds);
+      if (uErr) { console.error(uErr); }
+      (users || []).forEach(u => nameById.set(u.id, u.name));
+    }
+
+    // 3) Render rijen
+    const rowsHtml = (pays || []).map(p => {
+      const dt   = formatDate(p.created_at);
+      const name = nameById.get(p.user_id) || 'Onbekend';
+      const note = p?.note || '—';
+      return `
+        <tr>
+          <td>${esc(dt)}</td>
+          <td>${esc(name)}</td>
+          <td class="right">${euro(p.amount || 0)}</td>
+          <td>${esc(note)}</td>
+          <td><button class="btn delete-btn" onclick="deletePayment('${esc(p.id)}')">Verwijderen</button></td>
+        </tr>
+      `;
+    }).join('');
+
+    if ($(selRows)) {
+      $(selRows).innerHTML = rowsHtml || `<tr><td colspan="5" class="muted">Geen betalingen gevonden</td></tr>`;
+    }
+  } catch (e) {
+    console.error('loadPayments failed:', e);
+    if ($(selRows)) $(selRows).innerHTML = `<tr><td colspan="5" class="muted">Kon betalingen niet laden</td></tr>`;
+  }
 }
 
 export async function addPayment(selUser='#pay-user', selAmount='#pay-amount', selNote='#p-note', after=()=>{}){
@@ -272,7 +293,7 @@ export async function loadOpenPerUser(sel='#tbl-open-users'){
       `<tr><td>${esc(name)}</td><td class="right">${v.count}</td><td class="right">${euro(v.amount)}</td></tr>`)
     .join('');
 
-  if ($(sel)) $(sel).innerHTML = rows;
+  if ($(sel)) $(sel).innerHTML = rows || '<tr><td colspan="3" class="muted">Geen data</td></tr>';
 }
 
 export async function loadAging(sel='#tbl-aging'){
@@ -296,5 +317,11 @@ export async function loadAging(sel='#tbl-aging'){
     .map(([label, amt]) => `<tr><td>${esc(label)}</td><td class="right">${euro(amt)}</td></tr>`)
     .join('');
 
-  if ($(sel)) $(sel).innerHTML = rows;
+  if ($(sel)) $(sel).innerHTML = rows || '<tr><td colspan="2" class="muted">Geen data</td></tr>';
+}
+
+/* ---------- Helpers ---------- */
+function formatDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('nl-NL');
 }
