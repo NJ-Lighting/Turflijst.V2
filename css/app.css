@@ -200,11 +200,22 @@ input[type="date"] {
 /* === Compact Tables (Finance, etc.) === */
 .table.compact th,
 .table.compact td {
-  padding: 6px 8px;
-  line-height: 1.2;
-  font-size: .9rem;
+  padding: 5px 6px;
+  line-height: 1.1;
+  font-size: 0.85rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.table.compact th {
+  background: var(--green);
+  font-weight: bold;
 }
 
 .table.compact tr {
-  border-bottom: 1px solid rgba(0, 0, 0, .1);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.table.compact td.right,
+.table.compact th.right {
+  text-align: right;
 }
