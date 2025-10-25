@@ -27,7 +27,6 @@
     </div>
     <p class="muted">Kort overzicht van de huidige status (Snapshot), stromen per periode en transparantieblokken.</p>
 
-    <!-- Snapshot -->
     <h2>📍 Snapshot (nu)</h2>
     <p class="muted">Actuele stand: koelkast, wat is voorgeschoten, openstaand en totaalstromen sinds de start.</p>
     <section class="cards grid" style="margin-top:8px">
@@ -43,7 +42,6 @@
       <div class="card kpi"><div class="lbl">Marge (all time)</div><div id="kpi-margin" class="val">€0,00</div></div>
     </section>
 
-    <!-- Buffer -->
     <h2>💾 Buffer (statiegeld)</h2>
     <p class="muted">Tegoed aan statiegeld: wat is ingelegd, al verbruikt en nog beschikbaar.</p>
     <section class="cards grid" style="margin-top:8px">
@@ -52,7 +50,6 @@
       <div class="card kpi"><div class="lbl">Buffer beschikbaar</div><div id="kpi-buffer-available" class="val">€0,00</div></div>
     </section>
 
-    <!-- Statiegeld registreren -->
     <section class="card section">
       <h2>🏦 Statiegeld registreren</h2>
       <p class="muted">Log hier ingeleverd statiegeld. Dit telt op bij ‘Buffer in’.</p>
@@ -63,7 +60,6 @@
       </div>
     </section>
 
-    <!-- Verkoop & Geldstromen -->
     <h2>🧮 Verkoop & Geldstromen</h2>
     <p class="muted">Welke producten lopen hard en welke betalingen zijn er binnengekomen.</p>
     <section class="card section">
@@ -74,7 +70,6 @@
       </table>
     </section>
 
-    <!-- Betalingen -->
     <section class="card section">
       <h2>💸 Betalingen</h2>
       <p class="muted">Filter op gebruiker om alleen diens betalingen te zien. Voeg nieuwe betalingen onderaan toe.</p>
@@ -82,13 +77,12 @@
         <label for="filter-user" class="muted">Filter gebruiker</label>
         <select id="filter-user" class="select"></select>
       </div>
-      <table class="table">
+      <table class="table compact">
         <thead>
           <tr>
             <th>Datum</th>
             <th>Gebruiker</th>
             <th class="right">Bedrag</th>
-            <th>Opmerking</th>
             <th>Actie</th>
           </tr>
         </thead>
@@ -97,12 +91,10 @@
       <div class="row">
         <select id="pay-user" class="select" title="Gebruiker"></select>
         <input id="pay-amount" class="input" type="number" inputmode="decimal" step="0.01" placeholder="Bedrag in €" />
-        <input id="p-note" class="input" type="text" placeholder="Opmerking (optioneel)" />
         <button id="btn-add-payment" class="btn">Betaling toevoegen</button>
       </div>
     </section>
 
-    <!-- Transparantie -->
     <h2>🔎 Transparantie</h2>
     <p class="muted">Uitleg van het openstaande totaal: per persoon en uitgesplitst naar ouderdom (aging).</p>
     <section class="card section">
@@ -113,7 +105,6 @@
       </table>
     </section>
 
-    <!-- Aging -->
     <section class="card section">
       <h2>⏳ Aging (onbetaald)</h2>
       <table class="table">
@@ -122,7 +113,6 @@
       </table>
     </section>
 
-    <!-- Maandoverzicht -->
     <section class="card section">
       <h2>📅 Maandoverzicht</h2>
       <p class="muted">Omzet = som van verkoopprijzen op verkoopmoment. COGS = som van historische inkoopprijzen. Marge = Omzet − COGS.</p>

@@ -53,7 +53,8 @@ export async function loadKPIs(){
   } catch{}
 
   const bufferAvailable = Math.max(0, depositIn - bufferOut);
-  const prepaid = fridge + unpaid;                 // Totale voorgeschoten
+  const prepaid = fridge + unpaid; // Totale voorgeschoten (huidige voorraad + openstaand)
+
   // Omzet, COGS, Marge (cumulatief)
   const { data: salesRows } = await supabase
     .from('drinks')
@@ -61,20 +62,24 @@ export async function loadKPIs(){
   const revenue = (salesRows||[]).reduce((s,r)=> s + Number(r.sell_price_at_purchase||0), 0);
   const cogs    = (salesRows||[]).reduce((s,r)=> s + Number(r.price_at_purchase||0), 0);
   const margin  = revenue - cogs;
+
   // Profit (cash-achtig)
   const profit  = (received + depositIn) - prepaid;
 
+  // Render
   const set = (sel, val) => { if($(sel)) $(sel).textContent = euro(val); };
   set('#kpi-fridge', fridge);
   set('#kpi-prepaid', prepaid);
   set('#kpi-received', received);
   set('#kpi-deposit-earned', depositIn);
   set('#kpi-profit', profit);
+
   // extra KPI’s
   set('#kpi-open', unpaid);
   set('#kpi-revenue', revenue);
   set('#kpi-cogs', cogs);
   set('#kpi-margin', margin);
+
   // Buffer-blok
   set('#kpi-buffer-in', depositIn);
   set('#kpi-buffer-out', bufferOut);
@@ -104,68 +109,65 @@ export async function loadSoldPerProduct(){
 /* ---------- Betalingen ---------- */
 export async function loadPayments(selRows = '#tbl-payments', selFilterUser = '#filter-user'){
   try {
-    if ($(selRows)) $(selRows).innerHTML = `<tr><td colspan="5">Laden…</td></tr>`;
+    if ($(selRows)) $(selRows).innerHTML = `<tr><td colspan="4">Laden…</td></tr>`;
     const userId = $(selFilterUser)?.value || '';
 
-    // Zonder filter géén user_id opvragen (RLS-vriendelijk)
-    const cols = userId ? 'id, user_id, amount, created_at' : 'id, amount, created_at';
-    let q = supabase.from('payments').select(cols);
+    // Altijd user_id selecteren zodat namen getoond kunnen worden
+    let q = supabase.from('payments').select('id, user_id, amount, created_at');
     if (userId) q = q.eq('user_id', userId);
     q = q.order('created_at', { ascending: false }).limit(300);
 
     const { data: pays, error: pErr } = await q;
     if (pErr) {
       console.error('payments query:', pErr);
-      $(selRows).innerHTML = `<tr><td colspan="5" class="muted">Kon betalingen niet laden: ${esc(pErr.message || 'onbekend')}</td></tr>`;
+      if ($(selRows)) $(selRows).innerHTML = `<tr><td colspan="4" class="muted">Kon betalingen niet laden</td></tr>`;
       return;
     }
 
-    // Bij filter: usernamen ophalen
-    let nameById = new Map();
-    if (userId) {
-      const ids = Array.from(new Set((pays || []).map(p => p.user_id).filter(Boolean)));
-      if (ids.length) {
-        const { data: users, error: uErr } = await supabase
-          .from('users').select('id, name').in('id', ids);
-        if (uErr) console.error('users for payments:', uErr);
-        (users || []).forEach(u => nameById.set(u.id, u.name));
-      }
+    // Namen in één keer ophalen
+    const ids = Array.from(new Set((pays || []).map(p => p.user_id).filter(Boolean)));
+    const nameById = new Map();
+    if (ids.length) {
+      const { data: users, error: uErr } = await supabase
+        .from('users').select('id, name').in('id', ids);
+      if (uErr) console.error('users for payments:', uErr);
+      (users || []).forEach(u => nameById.set(u.id, u.name));
     }
 
     const rowsHtml = (pays || []).map(p => {
       const dt   = formatDate(p.created_at);
-      const name = userId ? (nameById.get(p.user_id) || 'Onbekend') : '—';
+      const name = nameById.get(p.user_id) || '—';
       return `
         <tr>
           <td>${esc(dt)}</td>
           <td>${esc(name)}</td>
           <td class="right">${euro(p.amount || 0)}</td>
-          <td>—</td>
-          <td><button class="btn delete-btn" onclick="deletePayment('${esc(p.id)}')">Verwijderen</button></td>
+          <td><button class="btn delete-btn" data-del-id="${esc(p.id)}">Verwijderen</button></td>
         </tr>`;
     }).join('');
 
-    $(selRows).innerHTML = rowsHtml || `<tr><td colspan="5" class="muted">Geen betalingen gevonden</td></tr>`;
+    $(selRows).innerHTML = rowsHtml || `<tr><td colspan="4" class="muted">Geen betalingen gevonden</td></tr>`;
   } catch (e) {
     console.error('loadPayments failed:', e);
-    if ($(selRows)) $(selRows).innerHTML = `<tr><td colspan="5" class="muted">Kon betalingen niet laden: ${esc(e?.message || e)}</td></tr>`;
+    if ($(selRows)) $(selRows).innerHTML = `<tr><td colspan="4" class="muted">Kon betalingen niet laden</td></tr>`;
   }
 }
 
-export async function addPayment(selUser='#pay-user', selAmount='#pay-amount', selNote='#p-note', after=()=>{}){
+export async function addPayment(selUser='#pay-user', selAmount='#pay-amount', selNote=null, after=()=>{}){
   const userId = $(selUser)?.value;
   const amountStr = $(selAmount)?.value?.trim() || '';
   if(!userId) return toast('⚠️ Kies eerst een gebruiker');
   const amount = parseFloat(amountStr.replace(',', '.'));
   if(!(amount > 0)) return toast('⚠️ Vul een geldig bedrag in');
 
-  // Alleen bestaande kolommen gebruiken
-  const { error } = await supabase.from('payments').insert([{ user_id: userId, amount }]);
+  const extRef = `v2pay-${userId}-${Date.now()}`;
+  const payload = { user_id: userId, amount, ext_ref: extRef }; // geen 'note' kolom
+
+  const { error } = await supabase.from('payments').insert([payload]);
   if(error){ console.error(error); return toast('❌ Fout bij registreren betaling'); }
 
   toast('✅ Betaling geregistreerd');
   if($(selAmount)) $(selAmount).value = '';
-  if($(selNote)) $(selNote).value = ''; // UI reset blijft prima
   await after();
 }
 
@@ -185,7 +187,8 @@ export async function addDeposit(selAmount='#deposit-amount', selNote='#deposit-
   if(!(amount > 0)) return toast('⚠️ Vul een geldig statiegeld-bedrag in');
 
   const payload = { amount };
-  if (note) payload.note = note; // deposits kán wel een note hebben; laat staan
+  if (note) payload.note = note;
+
   const { error } = await supabase.from('deposits').insert([payload]);
   if (error){ console.error(error); return toast('❌ Fout bij opslaan statiegeld'); }
 
@@ -196,12 +199,13 @@ export async function addDeposit(selAmount='#deposit-amount', selNote='#deposit-
 }
 
 export async function loadDepositMetrics(){
+  // hergebruik loadKPIs zodat de UI consistent blijft
   await loadKPIs();
 }
 
 /* ---------- Maand-statistiek ---------- */
 export async function loadMonthlyStats(selContainer='#month-stats'){
-  if (!$(selContainer)) return;
+  if (!$(selContainer)) return; // alleen draaien als er UI voor is
 
   // drinks per maand (omzet & cogs)
   const { data: drinks } = await supabase

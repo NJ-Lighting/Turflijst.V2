@@ -1,41 +1,190 @@
-:root{ --green:#4CAF50; --green-d:#2f7f3d; --btn:#1e5627; --danger:#d9534f; --danger-d:#c9302c; --panel: rgba(0,0,0,.80); --panel-2: rgba(0,0,0,.85); --text:#fff; --muted:#d5d5d5; --border:#000; }
-*{ box-sizing:border-box }
-html,body{ height:100% }
-body{ margin:0; font-family:Arial,sans-serif; color:var(--text); text-align:center; padding:20px; }
-
-.bg-train{ background:url('/Train%20scene.webp') no-repeat center center fixed; background-size:cover; }
-
-.content-wrapper{ background:var(--panel); padding:20px; border-radius:10px; display:inline-block; width:min(95%, 1000px); }
-
-.btn{ display:inline-block; padding:15px 20px; font-size:18px; margin:10px; cursor:pointer; border:none; border-radius:10px; background:var(--btn); color:#fff; transition:transform .2s, background .2s; }
-.btn:hover{ background:var(--green-d); transform:scale(1.07) }
-.btn.block{ display:block; width:min(90%, 250px); margin-inline:auto }
-.btn.btn-warn{ background:var(--danger) }
-.btn.btn-warn:hover{ background:var(--danger-d) }
-.btn.ghost{ background:#f0f0f0; color:#111 }
-
-.select, select, input[type="number"], input[type="text"]{ font-size:18px; padding:12px; width:90%; margin:10px 0; border-radius:8px; background:#222; color:#fff; border:1px solid var(--green); text-align:center; }
-
-.table{ width:100%; border-collapse:collapse; margin-top:20px; background:#fff; color:#000; border-radius:10px; overflow:hidden; border:2px solid var(--border); }
-.table th, .table td{ border:2px solid var(--border); padding:10px; text-align:center; }
-.table th{ background:var(--green); color:#fff }
-.table td.right, .table th.right{ text-align:right; }
-
-.product-grid{
-  display:grid;
-  grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));
-  gap:20px; width:100%; max-width:600px; margin-inline:auto;
+/* =========================================
+   Basislayout & achtergrond
+   ========================================= */
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  color: white;
+  text-align: center;
+  background: url('/Train%20scene.webp') no-repeat center center fixed;
+  background-size: cover;
 }
-.product-grid > div{ display:flex; justify-content:center; }
 
-.drink-btn{
-  display:flex; align-items:center; justify-content:flex-start;
-  padding:10px 15px; font-size:18px; border:none; border-radius:10px;
-  background:var(--btn); color:#fff; transition:transform .2s, background .2s;
-  width:90%; max-width:250px; text-align:left;
+.content-wrapper {
+  background: rgba(0, 0, 0, 0.8);
+  margin: 2rem auto;
+  padding: 2rem;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 900px;
 }
-.drink-btn:hover{ background:var(--green-d); transform:scale(1.07) }
-.drink-btn img{ height:40px; width:40px; object-fit:contain; margin-right:15px; border-radius:5px }
 
-.toast{ position:fixed; bottom:30px; left:50%; transform:translateX(-50%); background:var(--green); color:#fff; padding:12px 20px; border-radius:10px; font-size:18px; z-index:1000; transition:opacity .5s; }
-.flex{ display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; max-width:1000px; margin-inline:auto; }
+/* =========================================
+   Koppen, secties & titels
+   ========================================= */
+h1, h2, h3 {
+  margin-top: 0;
+  color: #fff;
+}
+
+.section-title {
+  background-color: #4CAF50;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 8px;
+  margin-top: 30px;
+  display: inline-block;
+}
+
+/* =========================================
+   Tabellen
+   ========================================= */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  color: black;
+  border: 2px solid black;
+}
+
+.table th,
+.table td {
+  border: 2px solid black;
+  padding: 10px;
+  text-align: center;
+}
+
+.table th {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.table tr:nth-child(even) {
+  background-color: #f2f2f2;
+}
+
+/* Compacte tabellen (Finance etc.) */
+.table.compact th,
+.table.compact td {
+  padding: 6px 8px;
+  line-height: 1.2;
+  font-size: 0.9rem;
+}
+
+.table.compact tr {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* =========================================
+   Knoppen
+   ========================================= */
+.btn {
+  padding: 15px 20px;
+  font-size: 18px;
+  margin: 10px;
+  border: none;
+  border-radius: 10px;
+  background-color: #1e5627;
+  color: white;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.btn:hover {
+  background-color: #2f7f3d;
+  transform: scale(1.07);
+}
+
+.btn-warn {
+  background-color: #d9534f;
+}
+
+.btn-warn:hover {
+  background-color: #c9302c;
+}
+
+.delete-btn {
+  background-color: #d9534f;
+  font-size: 0.9rem;
+  padding: 6px 10px;
+}
+
+.delete-btn:hover {
+  background-color: #c9302c;
+}
+
+/* =========================================
+   Inputvelden & dropdowns
+   ========================================= */
+.input, .select {
+  padding: 10px;
+  margin: 5px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+}
+
+.select {
+  background-color: white;
+  color: black;
+}
+
+/* =========================================
+   Productgrid (Index)
+   ========================================= */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+
+.product-grid button {
+  background-color: #4CAF50;
+  border: none;
+  border-radius: 10px;
+  color: white;
+  padding: 15px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.2s;
+}
+
+.product-grid button:hover {
+  background-color: #45a049;
+  transform: scale(1.05);
+}
+
+/* =========================================
+   Utility classes
+   ========================================= */
+.block {
+  display: block;
+  width: 100%;
+}
+
+.right {
+  text-align: right;
+}
+
+.muted {
+  color: #aaa;
+  font-style: italic;
+}
+
+/* =========================================
+   Iconkleuren (History)
+   ========================================= */
+.paid-cell {
+  text-align: center;
+  font-size: 1.2em;
+}
+.paid-yes {
+  color: #2ecc71; /* groen */
+}
+.paid-no {
+  color: #e74c3c; /* rood */
+}

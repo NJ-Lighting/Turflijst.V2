@@ -15,7 +15,6 @@ import {
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadUsersToSelects();
-
   await Promise.all([
     loadKPIs(),
     loadSoldPerProduct(),
@@ -27,13 +26,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Betaling toevoegen
   $('#btn-add-payment')?.addEventListener('click', async () => {
-    await addPayment('#pay-user', '#pay-amount', '#p-note', async () => {
+    await addPayment('#pay-user', '#pay-amount', null, async () => {
       await loadPayments();
       await loadKPIs();
       await loadOpenPerUser();
       await loadAging();
       await loadMonthlyStats('#month-stats');
     });
+  });
+
+  // Vernieuwen
+  $('#btn-refresh')?.addEventListener('click', async () => {
+    await loadUsersToSelects();
+    await loadKPIs();
+    await loadSoldPerProduct();
+    await loadPayments();
+    await loadOpenPerUser();
+    await loadAging();
+    await loadMonthlyStats('#month-stats');
   });
 
   // Statiegeld opslaan (buffer in)
@@ -50,8 +60,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadPayments();
   });
 
-  // Globale delete (voor inline onclick)
-  window.deletePayment = async (id) => {
+  // Delete via event delegation
+  $('#tbl-payments')?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button[data-del-id]');
+    if (!btn) return;
+    const id = btn.getAttribute('data-del-id');
     await deletePayment(id, async () => {
       await loadPayments();
       await loadKPIs();
@@ -60,5 +73,5 @@ document.addEventListener('DOMContentLoaded', async () => {
       await loadMonthlyStats('#month-stats');
       if (typeof loadDepositMetrics === 'function') await loadDepositMetrics();
     });
-  };
+  });
 });
