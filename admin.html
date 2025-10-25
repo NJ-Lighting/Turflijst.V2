@@ -7,14 +7,13 @@
   <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/css/nav.css" />
   <style>
-    /* Je bestaande styling behouden */
     body { font-family: Arial, sans-serif; text-align: center; padding: 20px;
       background: url('/Train%20scene.webp') no-repeat center center fixed; background-size: cover; color: white; }
     .content-wrapper { background: rgba(0,0,0,0.8); padding: 20px; border-radius: 10px; display: inline-block; width: 90%; max-width: 800px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; background: white; border-radius: 10px; overflow: hidden; color: black; border: 2px solid black; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: white; border-radius: 10px; overflow: hidden; color: black; border: 2px solid black; }
     th, td { border: 2px solid black; padding: 10px; text-align: center; }
     th { background-color: #4CAF50; color: white; }
-    .section-title { background-color: #4CAF50; color: white; padding: 10px 15px; border-radius: 8px; margin-top: 30px; display: inline-block; }
+    .section-title { background-color: #4CAF50; color: white; padding: 10px 20px; border-radius: 8px; margin-top: 30px; display: inline-block; }
     .btn { padding: 15px 20px; font-size: 18px; margin: 10px; border: none; border-radius: 10px; background-color: #1e5627; color: white; cursor: pointer; transition: transform .2s, background .2s; }
     .btn:hover { background-color: #2f7f3d; transform: scale(1.07); }
     .delete-btn { background-color: #d9534f; }
@@ -48,7 +47,7 @@
           <th>Acties</th>
         </tr>
       </thead>
-      <tbody id="userTable"></tbody>
+      <tbody id="tbl-users"></tbody>
     </table>
 
     <div class="section-title">🛒 Productbeheer</div>
@@ -61,22 +60,21 @@
           <th>Acties</th>
         </tr>
       </thead>
-      <tbody id="productTable"></tbody>
+      <tbody id="tbl-products"></tbody>
     </table>
 
-    <div class="section-title">➕ Nieuw Product Toevoegen</div>
-    <input type="text" id="newProductName" placeholder="Productnaam" />
-    <input type="number" id="newProductPrice" placeholder="Prijs (€)" step="0.01" inputmode="decimal" />
-    <input type="file" id="productImage" accept="image/*" />
-    <button class="btn" id="btn-add-product" onclick="addProduct()">Toevoegen</button>
+    <div style="margin-top: 20px;">
+      <input type="text" id="new-product-name" placeholder="Productnaam" />
+      <input type="number" id="new-product-price" placeholder="Prijs" step="0.01" />
+      <input type="text" id="productImage" placeholder="Afbeeldings-URL (optioneel)" />
+      <button class="btn" id="btn-add-product">➕ Product toevoegen</button>
+    </div>
 
-    <br /><br />
     <button class="btn" onclick="location.href='/index.html'">🏠 Terug naar Hoofdpagina</button>
     <button class="btn" onclick="location.href='/stock.html'">📦 Ga naar Voorraadbeheer</button>
     <button class="btn" onclick="location.href='/finance.html'">💰 Ga naar Finance Pagina</button>
   </div>
 
-  <!-- Modules in juiste volgorde -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script type="module" src="/js/core.js"></script>
   <script type="module" src="/js/supabase.client.js"></script>

@@ -25,7 +25,7 @@
       <h1 style="margin:0;">💰 Finance</h1>
       <button id="btn-refresh" class="btn">🔄 Vernieuwen</button>
     </div>
-    <p class="muted">Kort overzicht van de huidige status (Snapshot), stromen per periode en transparantieblokken.</p>
+    <p class="muted">Kort overzicht van de huidige status (Snapshot), stromen per periode en transparantiebrokken.</p>
 
     <h2>📍 Snapshot (nu)</h2>
     <p class="muted">Actuele stand: koelkast, wat is voorgeschoten, openstaand en totaalstromen sinds de start.</p>
@@ -35,7 +35,6 @@
       <div class="card kpi"><div class="lbl">Ontvangen</div><div id="kpi-received" class="val">€0,00</div></div>
       <div class="card kpi"><div class="lbl">Statiegeld ontvangen</div><div id="kpi-deposit-earned" class="val">€0,00</div></div>
       <div class="card kpi"><div class="lbl">Profit/Loss</div><div id="kpi-profit" class="val">€0,00</div></div>
-
       <div class="card kpi"><div class="lbl">Openstaand</div><div id="kpi-open" class="val">€0,00</div></div>
       <div class="card kpi"><div class="lbl">Omzet (all time)</div><div id="kpi-revenue" class="val">€0,00</div></div>
       <div class="card kpi"><div class="lbl">COGS (all time)</div><div id="kpi-cogs" class="val">€0,00</div></div>
@@ -60,30 +59,32 @@
       </div>
     </section>
 
-    <h2>🧮 Verkoop & Geldstromen</h2>
-    <p class="muted">Welke producten lopen hard en welke betalingen zijn er binnengekomen.</p>
     <section class="card section">
-      <h2>📦 Verkocht per product</h2>
+      <h2>🧾 Verkocht per product</h2>
       <table class="table">
         <thead><tr><th>Product</th><th class="right">Aantal</th></tr></thead>
-        <tbody id="tbl-sold-per-product"></tbody>
+        <tbody id="tbl-sold-per-product"><tr><td colspan="2" class="muted">Wordt gevuld als data aanwezig is</td></tr></tbody>
       </table>
     </section>
 
     <section class="card section">
       <h2>💸 Betalingen</h2>
-      <p class="muted">Filter op gebruiker om alleen diens betalingen te zien. Voeg nieuwe betalingen onderaan toe.</p>
-      <div class="row">
-        <label for="filter-user" class="muted">Filter gebruiker</label>
-        <select id="filter-user" class="select"></select>
+      <div class="row" style="gap:8px;align-items:center;justify-content:space-between;">
+        <div class="row" style="gap:8px">
+          <label for="filter-user" class="sr-only">Filter gebruiker</label>
+          <select id="filter-user" class="select">
+            <option>— Alle gebruikers —</option>
+          </select>
+        </div>
       </div>
-      <table class="table compact">
+
+      <table class="table">
         <thead>
           <tr>
             <th>Datum</th>
             <th>Gebruiker</th>
             <th class="right">Bedrag</th>
-            <th>Actie</th>
+            <th class="right">Actie</th>
           </tr>
         </thead>
         <tbody id="tbl-payments"></tbody>
@@ -91,6 +92,7 @@
       <div class="row">
         <select id="pay-user" class="select" title="Gebruiker"></select>
         <input id="pay-amount" class="input" type="number" inputmode="decimal" step="0.01" placeholder="Bedrag in €" />
+        <input id="p-note" class="input" type="text" placeholder="Opmerking (optioneel)" />
         <button id="btn-add-payment" class="btn">Betaling toevoegen</button>
       </div>
     </section>
@@ -115,7 +117,7 @@
 
     <section class="card section">
       <h2>📅 Maandoverzicht</h2>
-      <p class="muted">Omzet = som van verkoopprijzen op verkoopmoment. COGS = som van historische inkoopprijzen. Marge = Omzet − COGS.</p>
+      <p class="muted">Omzet = som van verkoopprijzen op verkopen, COGS = som van historische inkoopprijzen. Marge = Omzet − COGS.</p>
       <table class="table">
         <thead>
           <tr>
