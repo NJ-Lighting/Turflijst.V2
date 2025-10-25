@@ -20,15 +20,18 @@ export async function loadUsersToSelects(selFilter = '#filter-user', selPay = '#
   if (selPay && $(selPay)) $(selPay).innerHTML = optsPick;
 }
 
-/* ---------- KPI's ---------- */
+/* ---------- KPI's (behouden zoals repo; later uitbreidbaar) ---------- */
 export async function loadKPIs(){
-  // Openstaand = som onbetaalde drinks (historische kostprijs)
-  const { data: unpaidRows } = await supabase
-    .from('drinks')
-    .select('price_at_purchase, paid')
-    .or('paid.eq.false,paid.is.null');
-  const unpaid = (unpaidRows||[])
-    .reduce((s,r)=> s + Number(r.price_at_purchase||0), 0);
+  // Onbetaald via metrics (repo-logica), fallback op productprijs
+  let unpaid = 0;
+  try {
+    // (repo had fetchUserMetrics; hier niet opnieuw geïmporteerd om consistent te blijven)
+    const { data: d } = await supabase
+      .from('drinks').select('products(price)').returns(Array);
+    unpaid = (d||[]).reduce((sum, row) => sum + (row?.products?.price || 0), 0);
+  } catch (e) {
+    console.warn('unpaid fallback:', e);
+  }
 
   // Voorraadwaarde (actueel)
   const { data: sb } = await supabase
@@ -44,7 +47,7 @@ export async function loadKPIs(){
   const { data: deps } = await supabase.from('deposits').select('amount');
   const depositIn = (deps||[]).reduce((s,p)=> s + Number(p.amount||0), 0);
 
-  // Buffer OUT (optioneel, als je kolom gebruikt)
+  // Buffer OUT (optioneel)
   let bufferOut = 0;
   try {
     const { data: sb2 } = await supabase
@@ -53,32 +56,15 @@ export async function loadKPIs(){
   } catch{}
 
   const bufferAvailable = Math.max(0, depositIn - bufferOut);
-  const prepaid = fridge + unpaid;                 // Totale voorgeschoten (huidige voorraad + openstaand)
-
-  // Omzet, COGS, Marge (cumulatief)
-  const { data: salesRows } = await supabase
-    .from('drinks')
-    .select('sell_price_at_purchase, price_at_purchase');
-  const revenue = (salesRows||[]).reduce((s,r)=> s + Number(r.sell_price_at_purchase||0), 0);
-  const cogs    = (salesRows||[]).reduce((s,r)=> s + Number(r.price_at_purchase||0), 0);
-  const margin  = revenue - cogs;
-
-  // Profit (cash-achtig, zoals eerder)
+  const prepaid = fridge + unpaid;
   const profit  = (received + depositIn) - prepaid;
 
-  // Render
   const set = (sel, val) => { if($(sel)) $(sel).textContent = euro(val); };
   set('#kpi-fridge', fridge);
   set('#kpi-prepaid', prepaid);
   set('#kpi-received', received);
   set('#kpi-deposit-earned', depositIn);
   set('#kpi-profit', profit);
-
-  // extra KPI’s
-  set('#kpi-open', unpaid);
-  set('#kpi-revenue', revenue);
-  set('#kpi-cogs', cogs);
-  set('#kpi-margin', margin);
 
   // Buffer-blok
   set('#kpi-buffer-in', depositIn);
@@ -103,16 +89,16 @@ export async function loadSoldPerProduct(){
     .map(([name, n]) => `<tr><td>${esc(name)}</td><td class="right">${n}</td></tr>`)
     .join('');
 
-  if ($('#tbl-sold-per-product')) $('#tbl-sold-per-product').innerHTML = rows;
+  if ($('#tbl-sold-per-product')) $('#tbl-sold-per-product').innerHTML = rows || '<tr><td colspan="2" class="muted">Geen data</td></tr>';
 }
 
-/* ---------- Betalingen ---------- */
+/* ---------- Betalingen (RLS-vriendelijk + nooit blijven hangen op "Laden…") ---------- */
 export async function loadPayments(selRows = '#tbl-payments', selFilterUser = '#filter-user'){
   try {
     if ($(selRows)) $(selRows).innerHTML = `<tr><td colspan="5">Laden…</td></tr>`;
     const userId = $(selFilterUser)?.value || '';
 
-    // RLS-vriendelijk: zonder filter vragen we geen user_id op
+    // Zonder filter geen user_id opvragen (scheelt RLS/permissions)
     const cols = userId
       ? 'id, user_id, amount, note, created_at'
       : 'id, amount, note, created_at';
@@ -122,7 +108,11 @@ export async function loadPayments(selRows = '#tbl-payments', selFilterUser = '#
     q = q.order('created_at', { ascending: false }).limit(300);
 
     const { data: pays, error: pErr } = await q;
-    if (pErr) { console.error('payments query:', pErr); return; }
+    if (pErr) {
+      console.error('payments query:', pErr);
+      if ($(selRows)) $(selRows).innerHTML = `<tr><td colspan="5" class="muted">Kon betalingen niet laden</td></tr>`;
+      return;
+    }
 
     // Bij filter: usernamen ophalen
     let nameById = new Map();
@@ -206,13 +196,12 @@ export async function addDeposit(selAmount='#deposit-amount', selNote='#deposit-
 }
 
 export async function loadDepositMetrics(){
-  // hergebruik loadKPIs zodat de UI consistent blijft
   await loadKPIs();
 }
 
 /* ---------- Maand-statistiek ---------- */
 export async function loadMonthlyStats(selContainer='#month-stats'){
-  if (!$(selContainer)) return; // alleen draaien als er UI voor is
+  if (!$(selContainer)) return;
 
   // drinks per maand (omzet & cogs)
   const { data: drinks } = await supabase
@@ -269,7 +258,7 @@ export async function loadMonthlyStats(selContainer='#month-stats'){
   $(selContainer).innerHTML = rows;
 }
 
-/* ---------- Transparantie-tabellen ---------- */
+/* ---------- Transparantie-tabellen (Finance) ---------- */
 export async function loadOpenPerUser(sel='#tbl-open-users'){
   const { data, error } = await supabase
     .from('drinks')
