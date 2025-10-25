@@ -74,7 +74,7 @@ export async function loadKPIs(){
   set('#kpi-deposit-earned', depositIn);
   set('#kpi-profit', profit);
 
-  // nieuwe KPI’s
+  // extra KPI’s
   set('#kpi-open', unpaid);
   set('#kpi-revenue', revenue);
   set('#kpi-cogs', cogs);
@@ -109,34 +109,36 @@ export async function loadSoldPerProduct(){
 /* ---------- Betalingen ---------- */
 export async function loadPayments(selRows = '#tbl-payments', selFilterUser = '#filter-user'){
   try {
+    if ($(selRows)) $(selRows).innerHTML = `<tr><td colspan="5">Laden…</td></tr>`;
     const userId = $(selFilterUser)?.value || '';
 
-    // 1) Haal betalingen op (zonder join)
-    let q = supabase
-      .from('payments')
-      .select('id, user_id, amount, note, created_at');
+    // RLS-vriendelijk: zonder filter vragen we geen user_id op
+    const cols = userId
+      ? 'id, user_id, amount, note, created_at'
+      : 'id, amount, note, created_at';
+
+    let q = supabase.from('payments').select(cols);
     if (userId) q = q.eq('user_id', userId);
     q = q.order('created_at', { ascending: false }).limit(300);
 
     const { data: pays, error: pErr } = await q;
-    if (pErr) { console.error(pErr); return; }
+    if (pErr) { console.error('payments query:', pErr); return; }
 
-    // 2) Maak user map (id -> name) in één keer
-    const userIds = Array.from(new Set((pays || []).map(p => p.user_id).filter(Boolean)));
+    // Bij filter: usernamen ophalen
     let nameById = new Map();
-    if (userIds.length) {
-      const { data: users, error: uErr } = await supabase
-        .from('users')
-        .select('id, name')
-        .in('id', userIds);
-      if (uErr) { console.error(uErr); }
-      (users || []).forEach(u => nameById.set(u.id, u.name));
+    if (userId) {
+      const ids = Array.from(new Set((pays || []).map(p => p.user_id).filter(Boolean)));
+      if (ids.length) {
+        const { data: users, error: uErr } = await supabase
+          .from('users').select('id, name').in('id', ids);
+        if (uErr) console.error('users for payments:', uErr);
+        (users || []).forEach(u => nameById.set(u.id, u.name));
+      }
     }
 
-    // 3) Render rijen
     const rowsHtml = (pays || []).map(p => {
       const dt   = formatDate(p.created_at);
-      const name = nameById.get(p.user_id) || 'Onbekend';
+      const name = userId ? (nameById.get(p.user_id) || 'Onbekend') : '—';
       const note = p?.note || '—';
       return `
         <tr>
@@ -145,13 +147,10 @@ export async function loadPayments(selRows = '#tbl-payments', selFilterUser = '#
           <td class="right">${euro(p.amount || 0)}</td>
           <td>${esc(note)}</td>
           <td><button class="btn delete-btn" onclick="deletePayment('${esc(p.id)}')">Verwijderen</button></td>
-        </tr>
-      `;
+        </tr>`;
     }).join('');
 
-    if ($(selRows)) {
-      $(selRows).innerHTML = rowsHtml || `<tr><td colspan="5" class="muted">Geen betalingen gevonden</td></tr>`;
-    }
+    $(selRows).innerHTML = rowsHtml || `<tr><td colspan="5" class="muted">Geen betalingen gevonden</td></tr>`;
   } catch (e) {
     console.error('loadPayments failed:', e);
     if ($(selRows)) $(selRows).innerHTML = `<tr><td colspan="5" class="muted">Kon betalingen niet laden</td></tr>`;
