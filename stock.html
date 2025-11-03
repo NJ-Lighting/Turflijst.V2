@@ -68,7 +68,7 @@
   <script type="module" src="/js/pages/stock.page.js"></script>
   <script type="module" src="/js/nav.js"></script>
 
-  <!-- V1-look voor inputs/selects -->
+  <!-- V1-look + delete-knoppen -->
   <style>
     .muted{opacity:.85;font-size:14px;display:block;margin-top:4px;}
     #batchForm .product-row{margin-bottom:6px;}
@@ -81,6 +81,12 @@
       background-color:#1e5627;color:#fff;transition:transform .2s,background .2s;
     }
     #addRowBtn:hover,#addBatchBtn:hover{background-color:#2f7f3d;transform:scale(1.04);}
+    .delete-btn{
+      background:#d9534f;border:none;color:#fff;cursor:pointer;
+      padding:8px 12px;border-radius:8px;line-height:1;
+    }
+    .delete-btn:hover{ background:#c9302c; }
+    .delete-btn.small{ padding:6px 10px; }
   </style>
 </body>
 </html>

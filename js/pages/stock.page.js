@@ -60,6 +60,7 @@ function addProductRow(){
   const del = document.createElement('button');
   del.textContent = '❌';
   del.type = 'button';
+  del.className = 'delete-btn';
   del.addEventListener('click', () => {
     if (container.querySelectorAll('.product-row').length > 1) row.remove();
   });
@@ -110,7 +111,7 @@ async function addBatch(){
         const factor = totalCount>0 ? (item.quantity/totalCount) : 0;
         korting = Math.min(depositBuffer * factor, maxKorting);
       } else if (mode==='partial'){
-        korting = Math.min(depositBuffer, maxKorting);
+        korting = Math.min(depositBuffer, maxKorting); // greedy per regel
       }
     }
     korting = Number(korting.toFixed(2));
@@ -132,7 +133,7 @@ async function addBatch(){
     for (const ins of inserts){
       const { error } = await supabase.from('stock_batches').insert(ins);
       if (error) throw error;
-      await updateProductPriceFromOldestBatch(ins.product_id);
+      await updateProductPriceFromOldestBatch(ins.product_id); // FIFO
     }
     toast(`✅ Batch toegevoegd. Verbruikte buffer: ${formatEUR(bufferUsed)}`);
     $('#batchForm').innerHTML = '';
@@ -200,7 +201,7 @@ async function loadStock(){
             <input type="number" min="0" value="${Number(b.quantity||0)}"
               onchange="updateBatch('${escAttr(b.id)}', ${Number(b.quantity||0)}, this.value, '${escAttr(b.product_id)}')"
               style="width:120px;background:#222;color:#fff;border:1px solid #4CAF50;border-radius:8px;padding:8px;text-align:center">
-            <button onclick="deleteBatch('${escAttr(b.id)}', '${escAttr(b.product_id)}')">❌</button>
+            <button class="delete-btn small" onclick="deleteBatch('${escAttr(b.id)}', '${escAttr(b.product_id)}')">❌</button>
           </td>
         </tr>`;
     }
