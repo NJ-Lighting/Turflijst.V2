@@ -6,6 +6,22 @@
   <title>📦 Voorraadbeheer</title>
   <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/css/nav.css" />
+  <!-- V1-look voor invoervelden (alleen styling, geen structurele wijzigingen) -->
+  <style>
+    /* Labels licht opschuiven en wit houden boven inputs */
+    .section .row label{display:block;margin-bottom:6px;color:#fff;}
+    /* V1-stijl op inputs/selects (padding, border, breedte, centreren) */
+    .section .row .input,
+    .section .row .select,
+    .section .row select,
+    .section .row input[type="number"],
+    .section .row input[type="text"]{
+      padding:10px;margin:8px;width:220px;border-radius:8px;border:1px solid #4CAF50;
+      background:#222;color:#fff;text-align:center;font-size:16px;
+    }
+    /* Hint-tekst zoals V1 */
+    .muted{opacity:.85;font-size:14px;display:block;margin-top:4px;}
+  </style>
 </head>
 <body class="bg-train">
   <header class="site-nav" role="banner">
