@@ -13,6 +13,47 @@
     .paid-cell { text-align: center; font-size: 1.2em; }
     .paid-yes { color: #2ecc71; } /* groen */
     .paid-no  { color: #e74c3c; } /* rood */
+
+    /* ✅ nieuwe stijl: filterbalk naast elkaar */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+    }
+    .filter-group label {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .filter-group input,
+    .filter-group select {
+      min-width: 180px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid #4CAF50;
+      background: #222;
+      color: #fff;
+      text-align: center;
+    }
+    .filter-bar .btn {
+      align-self: flex-end;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      background-color: #1e5627;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.2s;
+    }
+    .filter-bar .btn:hover {
+      background-color: #2f7f3d;
+      transform: scale(1.05);
+    }
   </style>
 </head>
 <body class="bg-train">
@@ -32,15 +73,21 @@
     <h1>📜 Geschiedenis</h1>
 
     <h2>Filter</h2>
-    <div>
-      <label for="h-user">Gebruiker</label><br />
-      <select id="h-user" class="select"></select>
+    <div class="filter-bar">
+      <div class="filter-group">
+        <label for="h-user">Gebruiker</label>
+        <select id="h-user" class="select"></select>
+      </div>
 
-      <label for="h-from">Vanaf</label><br />
-      <input id="h-from" class="select" type="date" />
+      <div class="filter-group">
+        <label for="h-from">Vanaf</label>
+        <input id="h-from" class="select" type="date" />
+      </div>
 
-      <label for="h-to">Tot en met</label><br />
-      <input id="h-to" class="select" type="date" />
+      <div class="filter-group">
+        <label for="h-to">Tot en met</label>
+        <input id="h-to" class="select" type="date" />
+      </div>
 
       <button class="btn" id="h-apply">🔎 Toepassen</button>
     </div>
