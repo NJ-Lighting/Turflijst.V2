@@ -4,9 +4,7 @@ import { supabase } from '../supabase.client.js';
 
 // Alleen saldi-functionaliteit op deze pagina
 document.addEventListener('DOMContentLoaded', async () => {
-  // V1: openstaande saldi + tools
   await renderOpenBalances();
-  // events voor zoek/admin
   $('#pb-search')?.addEventListener('input', renderOpenBalances);
   $('#pb-admin')?.addEventListener('click', toggleAdminMode);
 });
@@ -25,7 +23,7 @@ async function computeOpenBalances(searchTerm = '') {
     .order('name', { ascending: true });
   if (uErr) throw uErr;
 
-  // drinks: gebruik historische kostprijs, fallback = actuele products.price
+  // drinks: gebruik historische kostprijs; fallback = actuele products.price
   const { data: rows, error: dErr } = await supabase
     .from('drinks')
     .select('user_id, price_at_purchase, products(price)');
@@ -50,7 +48,7 @@ async function computeOpenBalances(searchTerm = '') {
       count: countByUser.get(u.id) || 0,
     }))
     .filter((u) => !q || String(u.name || '').toLowerCase().includes(q))
-    .filter((u) => u.amount > 0) // alleen wie echt iets open heeft
+    .filter((u) => u.amount > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
@@ -115,15 +113,16 @@ window.pbMarkPaid = async (userId) => {
   const amount = entry?.amount || 0;
   if (!(amount > 0)) return toast('Geen openstaand saldo');
 
-  const extRef = `paypage-${userId}-${Date.now()}`;
+  // Insert zonder ext_ref (kolom bestaat niet in jouw schema)
   const { error: pErr } = await supabase
     .from('payments')
-    .insert([{ user_id: userId, amount, ext_ref: extRef }]);
+    .insert([{ user_id: userId, amount }]);
   if (pErr) {
     console.error(pErr);
     return toast('❌ Betaling registreren mislukt');
   }
 
+  // Alle onbetaalde drankjes van deze user wissen
   const { error: dErr } = await supabase.from('drinks').delete().eq('user_id', userId);
   if (dErr) {
     console.error(dErr);
@@ -138,11 +137,10 @@ window.pbMarkPaid = async (userId) => {
  * PayTo / QR / Link
  * --------------------------- */
 
-// Stel je IBAN/naam/omschrijving samen:
 const BANK_NAME = 'NJ-Lighting';
 const BANK_IBAN = 'NL00BANK0123456789'; // <-- zet hier jouw IBAN
 const BANK_BIC = 'BANKNL2A';            // <-- optioneel; voor EPC QR
-const DESC_BASE = 'Drankjes koelkast';  // basisomschrijving
+const DESC_BASE = 'Drankjes koelkast';
 
 function buildPaytoLink(name, amount) {
   const euroStr = Number(amount || 0).toFixed(2);
@@ -193,7 +191,6 @@ window.pbCopyLink = async (userId, name, amount) => {
 
 window.pbShowQR = async (userId, name, amount) => {
   const payload = buildEpcPayload(name, amount);
-  // Simpele fallback: toon payload in een <pre id="qr-payload"> (optioneel modal)
   const pre = $('#qr-payload');
   const lbl = $('#qr-label');
   if (lbl) lbl.textContent = `${name} – ${euro(amount)}`;
