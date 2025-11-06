@@ -9,27 +9,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#pb-admin')?.addEventListener('click', toggleAdminMode);
 });
 
-/* ---------------------------
- * Openstaande saldi (V1)
- * --------------------------- */
-
 let ADMIN_MODE = false;
 
 async function computeOpenBalances(searchTerm = '') {
-  // users
   const { data: users, error: uErr } = await supabase
     .from('users')
     .select('id, name')
     .order('name', { ascending: true });
   if (uErr) throw uErr;
 
-  // drinks: gebruik historische kostprijs; fallback = actuele products.price
   const { data: rows, error: dErr } = await supabase
     .from('drinks')
     .select('user_id, price_at_purchase, products(price)');
   if (dErr) throw dErr;
 
-  // reduce per user
   const sumByUser = new Map();
   const countByUser = new Map();
   (rows || []).forEach((r) => {
@@ -71,8 +64,8 @@ async function renderOpenBalances() {
       const count = String(u.count);
 
       const actions = `
-        <button class="btn btn-small" onclick="pbPayto('${uid}','${name}', ${amountNum.toFixed(2)})">PayTo</button>
-        ${ADMIN_MODE ? `<button class="btn btn-small" onclick="pbMarkPaid('${uid}')">✅ Betaald</button>` : ''}
+        <button class="btn" style="padding:6px 10px;font-size:14px" onclick="pbPayto('${uid}','${name}', ${amountNum.toFixed(2)})">PayTo</button>
+        ${ADMIN_MODE ? `<button class="btn" style="padding:6px 10px;font-size:14px" onclick="pbMarkPaid('${uid}')">✅ Betaald</button>` : ''}
       `;
 
       return `
@@ -89,9 +82,6 @@ async function renderOpenBalances() {
     $('#pb-rows').innerHTML = rowsHtml || '<tr><td colspan="4">Geen resultaten</td></tr>';
 }
 
-/* ---------------------------
- * Admin-modus (PIN 0000)
- * --------------------------- */
 function toggleAdminMode() {
   if (!ADMIN_MODE) {
     const pin = prompt('Voer admin-PIN in:');
@@ -103,15 +93,12 @@ function toggleAdminMode() {
   renderOpenBalances();
 }
 
-// Markeer als betaald: insert in payments en drinks wissen
 window.pbMarkPaid = async (userId) => {
-  // herbereken bedrag i.p.v. uit tabel te vertrouwen
   const balances = await computeOpenBalances('');
   const entry = balances.find((b) => b.id === userId);
   const amount = entry?.amount || 0;
   if (!(amount > 0)) return toast('Geen openstaand saldo');
 
-  // Insert zonder extra velden
   const { error: pErr } = await supabase
     .from('payments')
     .insert([{ user_id: userId, amount }]);
@@ -120,7 +107,6 @@ window.pbMarkPaid = async (userId) => {
     return toast('❌ Betaling registreren mislukt');
   }
 
-  // Alle onbetaalde drankjes van deze user wissen
   const { error: dErr } = await supabase.from('drinks').delete().eq('user_id', userId);
   if (dErr) {
     console.error(dErr);
@@ -130,10 +116,6 @@ window.pbMarkPaid = async (userId) => {
   toast(`✅ Betaald: ${euro(amount)}`);
   await renderOpenBalances();
 };
-
-/* ---------------------------
- * PayTo
- * --------------------------- */
 
 const BANK_IBAN = 'NL00BANK0123456789'; // <-- zet hier jouw IBAN
 const DESC_BASE = 'Drankjes koelkast';

@@ -10,7 +10,6 @@
   <link rel="stylesheet" href="/css/nav.css" />
 </head>
 <body class="bg-train">
-  <!-- Consistente hamburger navigatie -->
   <header class="site-nav" role="banner">
     <button class="nav-toggle" aria-controls="nav-drawer" aria-expanded="false" aria-label="Menu openen">☰</button>
     <nav id="nav-drawer" class="nav-drawer" role="navigation" aria-label="Hoofdnavigatie">
@@ -28,20 +27,19 @@
   <div class="content-wrapper">
     <h1>💳 Openstaande saldi</h1>
 
-    <!-- V1: Openstaande saldi (nette layout + tabel, logica ongewijzigd) -->
     <section class="saldi-section">
       <h2>Openstaande saldi</h2>
       <div class="saldi-controls">
         <input id="pb-search" class="select" type="search" placeholder="🔍 Zoek gebruiker…" />
         <button class="btn" id="pb-admin">🔧 Admin-modus</button>
       </div>
-      <table class="table" id="saldi-table">
+      <table class="table compact" id="saldi-table">
         <thead>
           <tr>
             <th>Gebruiker</th>
             <th>Aantal</th>
             <th>Openstaand (€)</th>
-            <th>Acties</th>
+            <th>Actie</th>
           </tr>
         </thead>
         <tbody id="pb-rows"></tbody>
