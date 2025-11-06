@@ -45,7 +45,7 @@ async function loadUsers() {
       console.log('[loadUsers] Fallback totals computed. size=', balances.size);
     }
 
-    // 🕓 Flags laden (wie heeft "Betalen" gemeld?)
+    // 🕓 Flags laden (niet kritisch; badge verdwijnt gewoon als er geen is)
     const flags = new Map();
     try {
       const { data: pf } = await supabase
@@ -58,6 +58,7 @@ async function loadUsers() {
 
     const rows = (users || []).map(u => {
       const due = balances.get(u.id) || 0;
+
       const attemptISO = flags.get(u.id) || null;
       const attemptText = attemptISO
         ? new Date(attemptISO).toLocaleString('nl-NL', {
@@ -65,11 +66,11 @@ async function loadUsers() {
             hour: '2-digit', minute: '2-digit'
           })
         : null;
-      const accCell = attemptISO
-        ? `🕓 <small title="Gemeld op: ${attemptText}">${attemptText}</small> <button class="btn btn-small" onclick="clearPaymentFlag('${u.id}')">🗑️</button>`
-        : '—';
+      const accBadge = attemptISO
+        ? `<div class="mini-flag">🕓 <small title="Gemeld op: ${attemptText}">${attemptText}</small> <button class="btn btn-tiny" onclick="clearPaymentFlag('${u.id}')">🗑️</button></div>`
+        : '';
 
-      // Let op: onderstaande <td>-volgorde moet aansluiten op jouw admin.html headers.
+      // Let op: plaats de cellen zodat dit met je admin.html overeenkomt
       return `
         <tr>
           <td>
@@ -83,8 +84,8 @@ async function loadUsers() {
             </label>
           </td>
           <td>€${Number.isFinite(due) ? due.toFixed(2) : '0.00'}</td>
-          <td class="acc-cell">${accCell}</td>
           <td>
+            ${accBadge}
             <button class="btn btn-small" onclick="updateUser('${u.id}')">Opslaan</button>
             <button class="btn btn-small" onclick="zeroUser('${u.id}')">Reset</button>
             <button class="btn btn-small" onclick="markAsPaid('${u.id}')">✅ Betaald</button>
@@ -246,7 +247,7 @@ async function loadProducts() {
     try {
       const { data } = supabase.storage.from('product-images').getPublicUrl(p.image_url);
       const url = data?.publicUrl || '#';
-      return `<img alt="${esc(p.name)}" src="${esc(url)}" style="height:28px">`;
+      return ``;
     } catch {
       return '—';
     }
