@@ -71,7 +71,7 @@ async function renderOpenBalances() {
       const count = String(u.count);
 
       const actions = `
-        <button class="btn btn-small" onclick="pbPayto('${uid}','${name}', ${amountNum.toFixed(2)})">PayTo</button>
+        <button class="btn btn-small" onclick="pbPayto('${uid}','${name}', ${amountNum.toFixed(2)})">Betalen</button>
         ${ADMIN_MODE ? `<button class="btn btn-small" onclick="pbMarkPaid('${uid}')">✅ Betaald</button>` : ''}
       `;
 
@@ -129,7 +129,7 @@ window.pbMarkPaid = async (userId) => {
 };
 
 /* ---------------------------
- * PayTo
+ * Betalen (PayTo) – functie blijft voorlopig ongewijzigd
  * --------------------------- */
 
 const BANK_IBAN = 'NL00BANK0123456789'; // <-- zet hier jouw IBAN
