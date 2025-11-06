@@ -19,6 +19,14 @@
       <button class="btn" onclick="location.href='./admin.html'">🔐 Admin</button>
     </div>
 
+    <!-- V1: Openstaande saldi (bovenaan) -->
+    <h2>Openstaande saldi</h2>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <input id="pb-search" class="select" type="search" placeholder="Zoek gebruiker…" />
+      <button class="btn" id="pb-admin">🔧 Admin-modus</button>
+    </div>
+    <div id="pb-rows"></div>
+
     <h2>Betaling registreren</h2>
     <div>
       <label for="p-user">Gebruiker</label><br />
@@ -47,15 +55,6 @@
       </thead>
       <tbody id="p-rows"></tbody>
     </table>
-
-    <!-- V1: Openstaande saldi sectie die door payment.page.js wordt gebruikt -->
-    <h2 style="margin-top:16px">Openstaande saldi</h2>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-      <input id="pb-search" class="select" type="search" placeholder="Zoek gebruiker…" />
-      <button class="btn" id="pb-admin">🔧 Admin-modus</button>
-    </div>
-    <div id="pb-rows"></div>
-
   </div>
 
   <script type="module" src="/js/pages/payment.page.js"></script>
