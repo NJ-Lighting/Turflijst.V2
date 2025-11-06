@@ -2,13 +2,13 @@
 import { $, euro, esc, toast } from '../core.js';
 import { supabase } from '../supabase.client.js';
 
-let GLOBAL_PAYLINK = null;            // open ING-link
-let PAYMENT_FLAGS = new Map();        // user_id -> attempted_at (ISO)
+let GLOBAL_PAYLINK = null;           // open betaallink
+let PAYMENT_FLAGS = new Map();       // user_id -> attempted_at (ISO)
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadGlobalPayLink();          // via view_payment_link_latest
-  await loadPaymentFlags();           // haal bestaande meldingen
-  await renderOpenBalances();         // render tabel
+  await loadPaymentFlags();           // betaalmeldingen binnenhalen
+  await renderOpenBalances();         // tabel tekenen
 
   $('#pb-search')?.addEventListener('input', renderOpenBalances);
   $('#pb-admin')?.addEventListener('click', toggleAdminMode);
@@ -81,9 +81,9 @@ async function renderOpenBalances() {
 
     const attemptISO = PAYMENT_FLAGS.get(u.id) || null;
     const attemptText = attemptISO
-      ? new Date(attemptISO).toLocaleString('nl-NL', { 
-          day:'2-digit', month:'2-digit', year:'numeric', 
-          hour:'2-digit', minute:'2-digit' 
+      ? new Date(attemptISO).toLocaleString('nl-NL', {
+          day:'2-digit', month:'2-digit', year:'numeric',
+          hour:'2-digit', minute:'2-digit'
         })
       : null;
     const attemptCell = ADMIN_MODE
@@ -198,16 +198,16 @@ async function flagPaymentAttempt(userId) {
 /* ---------------------------
  * Acties
  * --------------------------- */
-window.pbPayto = (userId, name, amount) => {
+window.pbPayto = async (userId, name, amount) => {
   if (!GLOBAL_PAYLINK) return toast('⚠️ Geen open betaallink ingesteld');
-
-  flagPaymentAttempt(userId)
-    .finally(async () => {
-      await loadPaymentFlags();
-      await renderOpenBalances();
-      try { window.location.href = GLOBAL_PAYLINK; }
-      catch { toast('⚠️ Kon betaallink niet openen'); }
-    });
+  try {
+    await flagPaymentAttempt(userId);
+    await loadPaymentFlags();
+    await renderOpenBalances();
+  } finally {
+    const w = window.open(GLOBAL_PAYLINK, '_blank', 'noopener,noreferrer');
+    if (!w) window.location.href = GLOBAL_PAYLINK;
+  }
 };
 
 window.pbMarkPaid = async (userId) => {
@@ -224,7 +224,7 @@ window.pbMarkPaid = async (userId) => {
   const { error: dErr } = await supabase.from('drinks').delete().eq('user_id', userId);
   if (dErr) return toast('⚠️ Betaling opgeslagen, maar drankjes niet gewist');
 
-  // vlag wissen
+  // vlag wissen + UI verversen
   try { await supabase.from('payment_flags').delete().eq('user_id', userId); } catch {}
 
   toast(`✅ Betaald: ${euro(amount)}`);
