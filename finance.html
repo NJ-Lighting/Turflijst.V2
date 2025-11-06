@@ -68,7 +68,11 @@
     </section>
   </main>
 
+  <!-- expliciet laden om import-keten 100% te garanderen -->
+  <script type="module" src="/js/core.js"></script>
+  <script type="module" src="/js/supabase.client.js"></script>
   <script type="module" src="/js/api/finance.js"></script>
+
   <script type="module" src="/js/pages/finance.page.js"></script>
   <script type="module" src="/js/nav.js"></script>
 </body>
