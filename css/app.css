@@ -15,7 +15,7 @@
   box-sizing:border-box;
 }
 
-html, body {
+html,body {
   height:100%;
 }
 
@@ -27,13 +27,13 @@ body {
   padding:20px;
 }
 
-/* === Achtergrond === */
+/* ===== Achtergrond ===== */
 .bg-train {
   background:url('/Train%20scene.webp') no-repeat center center fixed;
   background-size:cover;
 }
 
-/* === Algemene layout containers === */
+/* ===== Layout container ===== */
 .content-wrapper {
   background:var(--panel);
   padding:20px;
@@ -42,7 +42,7 @@ body {
   width:min(95%,1000px);
 }
 
-/* === Tabellen === */
+/* ===== Tabellen ===== */
 .table {
   width:100%;
   border-collapse:collapse;
@@ -74,7 +74,7 @@ body {
   border:1px solid rgba(0,0,0,.15);
 }
 
-/* === Buttons === */
+/* ===== Buttons ===== */
 .btn {
   background:var(--btn);
   color:#fff;
@@ -103,7 +103,7 @@ body {
   background:var(--danger-d);
 }
 
-/* === Select dropdowns === */
+/* ===== Select dropdowns ===== */
 .select {
   padding:8px 10px;
   border-radius:6px;
@@ -113,15 +113,11 @@ body {
   font-size:1rem;
 }
 
-/* === Diverse helpers === */
-.right {
-  text-align:right;
-}
-.block {
-  display:block;
-}
+/* ===== Misc helpers ===== */
+.right { text-align:right; }
+.block { display:block; }
 
-/* === Toast melding === */
+/* ===== Toast melding ===== */
 .toast {
   position:fixed;
   left:50%;
@@ -135,96 +131,94 @@ body {
   transition:opacity .25s ease;
 }
 
-/* === Utility voor kleine marges / tekst === */
+/* ===== Extra basiskleuren ===== */
 .muted {
   opacity:.8;
   font-size:.95rem;
 }
 
-/* === Appendix: utility classes (2025-11-06) === */
-
-/* index: helpers */
+/* ===== Turflijst.V2 – Appendix: index helpers ===== */
 .dropdown {
-  margin:0 0 12px;
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
+  margin: 0 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .section-title {
-  margin:18px 0 8px;
-  font-weight:700;
-  text-align:left;
+  margin: 18px 0 8px;
+  font-weight: 700;
+  text-align: left;
 }
 
-/* forms */
+/* ===== Turflijst.V2 – Appendix: input helper ===== */
 .input {
-  padding:8px 10px;
-  border-radius:6px;
-  border:1px solid rgba(255,255,255,.25);
-  background:rgba(0,0,0,.35);
-  color:#fff;
-  width:min(420px,100%);
-  margin:6px 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.25);
+  background: rgba(0,0,0,.35);
+  color: #fff;
+  width: min(420px, 100%);
+  margin: 6px 0 12px;
 }
 
-/* layout utilities (finance/stock/shared) */
+/* ===== Turflijst.V2 – Appendix: layout utilities ===== */
 .row {
-  display:flex;
-  flex-wrap:wrap;
-  gap:10px;
-  align-items:center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
 }
 .grid {
-  display:grid;
-  gap:10px;
-  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 .cards {
-  margin:8px 0;
+  margin: 8px 0;
 }
 .card {
-  background:rgba(0,0,0,.35);
-  border:1px solid rgba(255,255,255,.15);
-  border-radius:10px;
-  padding:12px;
+  background: rgba(0,0,0,.35);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 10px;
+  padding: 12px;
 }
 .section {
-  margin:14px 0;
-  text-align:left;
+  margin: 14px 0;
+  text-align: left;
 }
 
-/* finance kpi text helpers */
+/* ===== Turflijst.V2 – Appendix: kpi text helpers ===== */
 .kpi .lbl {
-  font-size:.9rem;
-  opacity:.85;
+  font-size: .9rem;
+  opacity: .85;
 }
 .kpi .val {
-  font-size:1.2rem;
-  font-weight:700;
-  margin-top:4px;
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-top: 4px;
 }
 
-/* a11y helper */
+/* ===== Turflijst.V2 – Appendix: sr-only a11y ===== */
 .sr-only {
-  position:absolute !important;
-  width:1px;
-  height:1px;
-  padding:0;
-  margin:-1px;
-  overflow:hidden;
-  clip:rect(0,0,0,0);
-  white-space:nowrap;
-  border:0;
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
 }
 
-/* payment page */
+/* ===== Turflijst.V2 – Appendix: payment helpers ===== */
 .saldi-section {
-  margin:14px 0;
-  text-align:left;
+  margin: 14px 0;
+  text-align: left;
 }
 .saldi-controls {
-  display:flex;
-  gap:10px;
-  align-items:center;
-  margin-bottom:10px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
 }
