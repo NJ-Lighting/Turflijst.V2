@@ -13,129 +13,61 @@
     <nav id="nav-drawer" class="nav-drawer" role="navigation" aria-label="Hoofdnavigatie">
       <a href="/index.html">Home</a>
       <a href="/admin.html">Admin</a>
-      <a href="/finance.html" aria-current="page">Finance</a>
       <a href="/stock.html">Voorraad</a>
-      <a href="/history.html">History</a>
-      <a href="/new-user.html">Nieuwe gebruiker</a>
+      <a href="/history.html">Geschiedenis</a>
+      <a href="/payment.html">Betalingen</a>
+      <a href="/finance.html" aria-current="page">Finance</a>
     </nav>
   </header>
 
-  <div class="content-wrapper">
-    <div class="row" style="justify-content:space-between;align-items:center;gap:12px;">
-      <h1 style="margin:0;">💰 Finance</h1>
-      <button id="btn-refresh" class="btn">🔄 Vernieuwen</button>
-    </div>
-    <p class="muted">Kort overzicht van de huidige status (Snapshot), stromen per periode en transparantiebrokken.</p>
+  <main class="content-wrapper">
+    <h1>💰 Finance</h1>
 
-    <h2>📍 Snapshot (nu)</h2>
-    <p class="muted">Actuele stand: koelkast, wat is voorgeschoten, openstaand en totaalstromen sinds de start.</p>
-    <section class="cards grid" style="margin-top:8px">
-      <div class="card kpi"><div class="lbl">Koelkastwaarde</div><div id="kpi-fridge" class="val">€0,00</div></div>
-      <div class="card kpi"><div class="lbl">Voorgeschoten</div><div id="kpi-prepaid" class="val">€0,00</div></div>
-      <div class="card kpi"><div class="lbl">Ontvangen</div><div id="kpi-received" class="val">€0,00</div></div>
-      <div class="card kpi"><div class="lbl">Statiegeld ontvangen</div><div id="kpi-deposit-earned" class="val">€0,00</div></div>
-      <div class="card kpi"><div class="lbl">Profit/Loss</div><div id="kpi-profit" class="val">€0,00</div></div>
-      <div class="card kpi"><div class="lbl">Openstaand</div><div id="kpi-open" class="val">€0,00</div></div>
-      <div class="card kpi"><div class="lbl">Omzet (all time)</div><div id="kpi-revenue" class="val">€0,00</div></div>
-      <div class="card kpi"><div class="lbl">COGS (all time)</div><div id="kpi-cogs" class="val">€0,00</div></div>
-      <div class="card kpi"><div class="lbl">Marge (all time)</div><div id="kpi-margin" class="val">€0,00</div></div>
+    <section class="section kpi">
+      <div class="grid cards" id="kpi-cards">
+        <!-- dynamisch gevuld -->
+      </div>
     </section>
 
-    <h2>💾 Buffer (statiegeld)</h2>
-    <p class="muted">Tegoed aan statiegeld: wat is ingelegd, al verbruikt en nog beschikbaar.</p>
-    <section class="cards grid" style="margin-top:8px">
-      <div class="card kpi"><div class="lbl">Buffer in</div><div id="kpi-buffer-in" class="val">€0,00</div></div>
-      <div class="card kpi"><div class="lbl">Buffer uit</div><div id="kpi-buffer-out" class="val">€0,00</div></div>
-      <div class="card kpi"><div class="lbl">Buffer beschikbaar</div><div id="kpi-buffer-available" class="val">€0,00</div></div>
+    <section class="section">
+      <h2 class="section-title">Verkocht per product</h2>
+      <table class="table"><tbody id="tbl-sold-per-product"></tbody></table>
     </section>
 
-    <section class="card section">
-      <h2>🏦 Statiegeld registreren</h2>
-      <p class="muted">Log hier ingeleverd statiegeld. Dit telt op bij ‘Buffer in’.</p>
+    <section class="section">
+      <h2 class="section-title">Betalingen</h2>
       <div class="row">
-        <input id="deposit-amount" class="input" type="number" inputmode="decimal" step="0.01" placeholder="Bedrag in €" />
-        <input id="deposit-note" class="input" type="text" placeholder="Opmerking (optioneel)" />
-        <button id="btn-add-deposit" class="btn">Opslaan</button>
+        <label class="sr-only" for="filter-user">Filter op gebruiker</label>
+        <select id="filter-user" class="select"></select>
       </div>
+      <table class="table" id="tbl-payments"></table>
     </section>
 
-    <section class="card section">
-      <h2>🧾 Verkocht per product</h2>
-      <table class="table">
-        <thead><tr><th>Product</th><th class="right">Aantal</th></tr></thead>
-        <tbody id="tbl-sold-per-product"><tr><td colspan="2" class="muted">Wordt gevuld als data aanwezig is</td></tr></tbody>
-      </table>
+    <section class="section">
+      <h2 class="section-title">Open per gebruiker</h2>
+      <table class="table"><tbody id="tbl-open-users"></tbody></table>
     </section>
 
-    <section class="card section">
-      <h2>💸 Betalingen</h2>
-      <div class="row" style="gap:8px;align-items:center;justify-content:space-between;">
-        <div class="row" style="gap:8px">
-          <label for="filter-user" class="sr-only">Filter gebruiker</label>
-          <select id="filter-user" class="select">
-            <option>— Alle gebruikers —</option>
-          </select>
-        </div>
-      </div>
+    <section class="section">
+      <h2 class="section-title">Achterstallig (aging)</h2>
+      <table class="table"><tbody id="tbl-aging"></tbody></table>
+    </section>
 
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Datum</th>
-            <th>Gebruiker</th>
-            <th class="right">Bedrag</th>
-            <th class="right">Actie</th>
-          </tr>
-        </thead>
-        <tbody id="tbl-payments"></tbody>
-      </table>
+    <section class="section">
+      <h2 class="section-title">Statiegeld per maand (verkopen / betalingen / statiegeld)</h2>
+      <div id="month-stats"></div>
+    </section>
+
+    <section class="section">
+      <h2 class="section-title">Statiegeld inleveren</h2>
       <div class="row">
-        <select id="pay-user" class="select" title="Gebruiker"></select>
-        <input id="pay-amount" class="input" type="number" inputmode="decimal" step="0.01" placeholder="Bedrag in €" />
-        <input id="p-note" class="input" type="text" placeholder="Opmerking (optioneel)" />
-        <button id="btn-add-payment" class="btn">Betaling toevoegen</button>
+        <input id="deposit-amount" class="input" type="text" placeholder="Bedrag (€)" />
+        <input id="deposit-note" class="input" type="text" placeholder="Notitie (optioneel)" />
+        <button id="btn-add-deposit" class="btn">Toevoegen</button>
       </div>
     </section>
+  </main>
 
-    <h2>🔎 Transparantie</h2>
-    <p class="muted">Uitleg van het openstaande totaal: per persoon en uitgesplitst naar ouderdom (aging).</p>
-    <section class="card section">
-      <h2>🧾 Openstaand per gebruiker</h2>
-      <table class="table">
-        <thead><tr><th>Gebruiker</th><th class="right">Aantal</th><th class="right">Bedrag</th></tr></thead>
-        <tbody id="tbl-open-users"></tbody>
-      </table>
-    </section>
-
-    <section class="card section">
-      <h2>⏳ Aging (onbetaald)</h2>
-      <table class="table">
-        <thead><tr><th>Bucket</th><th class="right">Bedrag</th></tr></thead>
-        <tbody id="tbl-aging"></tbody>
-      </table>
-    </section>
-
-    <section class="card section">
-      <h2>📅 Maandoverzicht</h2>
-      <p class="muted">Omzet = som van verkoopprijzen op verkopen, COGS = som van historische inkoopprijzen. Marge = Omzet − COGS.</p>
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Maand</th>
-            <th class="right">Omzet</th>
-            <th class="right">COGS</th>
-            <th class="right">Marge</th>
-            <th class="right">Betalingen</th>
-            <th class="right">Deposits</th>
-          </tr>
-        </thead>
-        <tbody id="month-stats"><tr><td colspan="6" class="muted">Wordt gevuld als data aanwezig is</td></tr></tbody>
-      </table>
-    </section>
-  </div>
-
-  <script type="module" src="/js/core.js"></script>
-  <script type="module" src="/js/supabase.client.js"></script>
   <script type="module" src="/js/api/finance.js"></script>
   <script type="module" src="/js/pages/finance.page.js"></script>
   <script type="module" src="/js/nav.js"></script>

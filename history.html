@@ -27,41 +27,19 @@
       border-radius: 12px;
       max-width: 800px;
     }
-    .filter-group {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-    }
-    .filter-group label {
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-    .filter-group input,
-    .filter-group select {
-      min-width: 180px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      border: 1px solid #4CAF50;
-      background: #222;
-      color: #fff;
-      text-align: center;
-      font-size: 15px;
+    .filter-group { display: flex; flex-direction: column; align-items: center; }
+    .filter-group label { font-weight: 600; margin-bottom: 6px; }
+    .filter-group input, .filter-group select {
+      min-width: 180px; padding: 10px 12px; border-radius: 8px;
+      border: 1px solid #4CAF50; background: #222; color: #fff;
+      text-align: center; font-size: 15px;
     }
     .filter-bar .btn {
-      align-self: flex-end;
-      padding: 12px 20px;
-      border: none;
-      border-radius: 10px;
-      background-color: #1e5627;
-      color: #fff;
-      font-size: 16px;
-      cursor: pointer;
+      align-self: flex-end; padding: 12px 20px; border: none; border-radius: 10px;
+      background-color: #1e5627; color: #fff; font-size: 16px; cursor: pointer;
       transition: background 0.2s, transform 0.2s;
     }
-    .filter-bar .btn:hover {
-      background-color: #2f7f3d;
-      transform: scale(1.05);
-    }
+    .filter-bar .btn:hover { background-color: #2f7f3d; transform: scale(1.05); }
   </style>
 </head>
 <body class="bg-train">
@@ -86,17 +64,14 @@
         <label for="h-user">Gebruiker</label>
         <select id="h-user" class="select"></select>
       </div>
-
       <div class="filter-group">
         <label for="h-from">Vanaf</label>
         <input id="h-from" class="select" type="date" />
       </div>
-
       <div class="filter-group">
         <label for="h-to">Tot en met</label>
         <input id="h-to" class="select" type="date" />
       </div>
-
       <button class="btn" id="h-apply">🔎 Toepassen</button>
     </div>
 
@@ -104,25 +79,16 @@
     <table class="table">
       <thead>
         <tr>
-          <th>Datum/Tijd</th>
-          <th>Gebruiker</th>
-          <th>Drankje</th>
-          <th>Prijs (€)</th>
-          <th>Betaald</th>
+          <th>Datum/Tijd</th><th>Gebruiker</th><th>Drankje</th><th>Prijs (€)</th><th>Betaald</th>
         </tr>
       </thead>
       <tbody id="h-rows"></tbody>
     </table>
 
     <h2>Totaal in selectie</h2>
-    <table class="table">
-      <tbody>
-        <tr>
-          <th style="width:50%">Som bedragen</th>
-          <td id="h-sum">€0,00</td>
-        </tr>
-      </tbody>
-    </table>
+    <table class="table"><tbody>
+      <tr><th style="width:50%">Som bedragen</th><td id="h-sum">€0,00</td></tr>
+    </tbody></table>
   </div>
 
   <script type="module" src="/js/pages/history.page.js"></script>

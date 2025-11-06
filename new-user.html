@@ -14,26 +14,33 @@
     <button class="nav-toggle" aria-controls="nav-drawer" aria-expanded="false" aria-label="Menu openen">☰</button>
     <nav id="nav-drawer" class="nav-drawer" role="navigation" aria-label="Hoofdnavigatie">
       <a href="/index.html">Home</a>
-      <a href="/admin.html">Admin</a>
-      <a href="/finance.html">Finance</a>
-      <a href="/stock.html">Voorraad</a>
-      <a href="/history.html">History</a>
+      <a href="/history.html">Geschiedenis</a>
       <a href="/new-user.html" aria-current="page">Nieuwe gebruiker</a>
+      <a href="/payment.html">Betalingen</a>
+      <a href="/admin.html">Admin</a>
+      <a href="/stock.html">Voorraad</a>
+      <a href="/finance.html">Finance</a>
     </nav>
   </header>
 
-  <div class="content-wrapper">
+  <main class="content-wrapper">
     <h1>👤 Nieuwe gebruiker</h1>
 
-    <h2>Toevoegen</h2>
-    <div>
-      <label for="nu-name">Naam</label><br />
-      <input id="nu-name" class="input" type="text" placeholder="Naam" />
-      <label for="nu-phone">Telefoonnummer (alleen zichtbaar voor Admin)</label><br />
-      <input id="nu-phone" class="input" type="text" inputmode="tel" placeholder="06-..." />
-      <button class="btn" id="nu-submit">➕ Gebruiker toevoegen</button>
+    <div class="section">
+      <label for="nu-name" class="section-title">Naam</label>
+      <input id="nu-name" class="input" type="text" placeholder="Voor- en achternaam" />
+
+      <label for="nu-phone" class="section-title">Telefoon (optioneel)</label>
+      <input id="nu-phone" class="input" type="tel" placeholder="+31…" />
+
+      <button id="nu-submit" class="btn">Toevoegen</button>
     </div>
-  </div>
+
+    <h2 class="section-title">Recent toegevoegd</h2>
+    <table class="table">
+      <tbody id="nu-recent"></tbody>
+    </table>
+  </main>
 
   <script type="module" src="/js/pages/new-user.page.js"></script>
   <script type="module" src="/js/nav.js"></script>

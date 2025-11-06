@@ -12,56 +12,40 @@
     <button class="nav-toggle" aria-controls="nav-drawer" aria-expanded="false" aria-label="Menu openen">☰</button>
     <nav id="nav-drawer" class="nav-drawer" role="navigation" aria-label="Hoofdnavigatie">
       <a href="/index.html" aria-current="page">Home</a>
-      <a href="/admin.html">Admin</a>
-      <a href="/finance.html">Finance</a>
-      <a href="/stock.html">Voorraad</a>
-      <a href="/history.html">History</a>
+      <a href="/history.html">Geschiedenis</a>
       <a href="/new-user.html">Nieuwe gebruiker</a>
+      <a href="/payment.html">Betalingen</a>
+      <a href="/admin.html">Admin</a>
+      <a href="/stock.html">Voorraad</a>
+      <a href="/finance.html">Finance</a>
     </nav>
   </header>
 
-  <div class="content-wrapper">
-    <h1>🍺 Turflijst</h1>
-    <p>Kies een gebruiker en klik op een drankje om te turven</p>
-
+  <main class="content-wrapper">
+    <!-- inhoud knoppen/overzichten … -->
     <div class="dropdown">
-      <label for="user">Gebruiker:</label>
+      <label class="section-title">Kies gebruiker</label>
       <select id="user" class="select"></select>
     </div>
 
-    <h2>Beschikbare Drankjes</h2>
     <div id="product-buttons" class="product-grid"></div>
-    <button
-      id="undo-btn"
-      class="btn btn-warn block"
-      onclick="undoLastDrink(this)"
-      disabled
-      aria-disabled="true"
-      title="Eerst een drankje loggen, daarna kun je één keer undo doen"
-    >⏪ Undo laatste drankje</button>
 
-    <h3 class="section-title">Totaal te betalen</h3>
+    <div class="section">
+      <button id="undo-btn" class="btn btn-warn">↩︎ Undo laatste drankje</button>
+    </div>
+
+    <h2 class="section-title">Totaal te betalen</h2>
     <table class="table">
-      <thead>
-        <tr>
-          <th scope="col">Gebruiker</th>
-          <th class="right" scope="col">Bedrag</th>
-        </tr>
-      </thead>
       <tbody id="totalToPayList"></tbody>
     </table>
 
-    <h3 class="section-title">Drankjes per gebruiker</h3>
+    <h2 class="section-title">Drankjes per gebruiker</h2>
     <table class="table">
       <thead id="userDrinkTotalsHead"></thead>
       <tbody id="userDrinkTotalsBody"></tbody>
     </table>
-  </div>
+  </main>
 
-  <script type="module" src="/js/core.js"></script>
-  <script type="module" src="/js/supabase.client.js"></script>
-  <script type="module" src="/js/api/stock.js"></script>
-  <script type="module" src="/js/api/metrics.js"></script>
   <script type="module" src="/js/pages/index.page.js"></script>
   <script type="module" src="/js/nav.js"></script>
 </body>
