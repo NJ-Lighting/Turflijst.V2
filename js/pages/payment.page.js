@@ -39,17 +39,17 @@ async function computeOpenBalances(searchTerm = '') {
     .order('name', { ascending: true });
   if (uErr) throw uErr;
 
-  // drinks: som op basis van historische kostprijs
+  // drinks: gebruik historische kostprijs, fallback = actuele products.price
   const { data: rows, error: dErr } = await supabase
     .from('drinks')
-    .select('user_id, price_at_purchase');
+    .select('user_id, price_at_purchase, products(price)');
   if (dErr) throw dErr;
 
   // reduce per user
   const sumByUser = new Map();
   const countByUser = new Map();
   (rows || []).forEach((r) => {
-    const price = Number(r?.price_at_purchase) || 0;
+    const price = Number(r?.price_at_purchase ?? r?.products?.price ?? 0);
     const uid = r.user_id;
     sumByUser.set(uid, (sumByUser.get(uid) || 0) + price);
     countByUser.set(uid, (countByUser.get(uid) || 0) + 1);
@@ -210,7 +210,7 @@ window.pbCopyLink = async (userId, name, amount) => {
 
 window.pbShowQR = async (userId, name, amount) => {
   const payload = buildEpcPayload(name, amount);
-  // Simpele fallback: toon payload in een <pre id="qr-payload"> in je HTML (modal).
+  // Simpele fallback: toon payload in een <pre id="qr-payload"> (optioneel modal)
   const pre = $('#qr-payload');
   const lbl = $('#qr-label');
   if (lbl) lbl.textContent = `${name} – ${euro(amount)}`;
