@@ -19,7 +19,7 @@
       <a href="/history.html">History</a>
       <a href="/new-user.html">New User</a>
       <a href="/admin.html">Admin</a>
-      <!-- Admin-bestemmingen; nav.js verplaatst deze naar beveiligde submenu na wachtwoord -->
+      <!-- Admin-bestemmingen; nav.js verplaatst ze naar beveiligde submenu na wachtwoord -->
       <a href="/admin.html">→ Admin pagina</a>
       <a href="/stock.html">→ Voorraad pagina</a>
       <a href="/finance.html">→ Finance pagina</a>
@@ -30,13 +30,25 @@
   <div class="content-wrapper">
     <h1>💳 Betalingen</h1>
 
-    <!-- V1: Openstaande saldi (bovenaan) -->
-    <h2>Openstaande saldi</h2>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-      <input id="pb-search" class="select" type="search" placeholder="Zoek gebruiker…" />
-      <button class="btn" id="pb-admin">🔧 Admin-modus</button>
-    </div>
-    <div id="pb-rows"></div>
+    <!-- V1: Openstaande saldi (nette layout + tabel, logica ongewijzigd) -->
+    <section class="saldi-section">
+      <h2>Openstaande saldi</h2>
+      <div class="saldi-controls">
+        <input id="pb-search" class="select" type="search" placeholder="🔍 Zoek gebruiker…" />
+        <button class="btn" id="pb-admin">🔧 Admin-modus</button>
+      </div>
+      <table class="table" id="saldi-table">
+        <thead>
+          <tr>
+            <th>Gebruiker</th>
+            <th>Aantal</th>
+            <th>Openstaand (€)</th>
+            <th>Acties</th>
+          </tr>
+        </thead>
+        <tbody id="pb-rows"></tbody>
+      </table>
+    </section>
 
     <h2>Betaling registreren</h2>
     <div>

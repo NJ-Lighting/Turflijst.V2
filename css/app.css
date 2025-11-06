@@ -219,3 +219,46 @@ input[type="date"] {
 .table.compact th.right {
   text-align: right;
 }
+
+/* === Openstaande saldi (Payment) === */
+.saldi-section {
+  margin: 16px auto 24px auto;
+  background: rgba(0, 0, 0, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  padding: 12px;
+  width: 100%;
+  max-width: 1000px;
+}
+
+.saldi-section h2 {
+  margin: 0 0 10px 0;
+  color: var(--text);
+}
+
+.saldi-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+#saldi-table {
+  width: 100%;
+}
+
+#saldi-table th,
+#saldi-table td {
+  padding: 10px;
+}
+
+#saldi-table th {
+  background: var(--green);
+  color: #fff;
+}
+
+#saldi-table tr:nth-child(even) td {
+  background: rgba(0, 0, 0, 0.03);
+}
