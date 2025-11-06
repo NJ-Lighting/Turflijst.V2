@@ -2,12 +2,10 @@
 import { $, euro, esc, toast } from '../core.js';
 import { supabase } from '../supabase.client.js';
 
-// Globale (open) betaallink voor iedereen
 let GLOBAL_PAYLINK = null; // string | null
 
-// Alleen saldi-functionaliteit op deze pagina
 document.addEventListener('DOMContentLoaded', async () => {
-  await loadGlobalPayLink();     // laad globale betaallink (indien aanwezig)
+  await loadGlobalPayLink();     // laad globale open betaallink
   await renderOpenBalances();
 
   $('#pb-search')?.addEventListener('input', renderOpenBalances);
@@ -15,28 +13,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* ---------------------------
- * Openstaande saldi (V1)
+ * Openstaande saldi
  * --------------------------- */
 
 let ADMIN_MODE = false;
 
 async function computeOpenBalances(searchTerm = '') {
-  // users
-  const { data: users, error: uErr } = await supabase
+  const { data: users } = await supabase
     .from('users')
     .select('id, name')
     .order('name', { ascending: true });
-  if (uErr) throw uErr;
 
-  // drinks: gebruik historische kostprijs; fallback = actuele products.price
-  const { data: rows, error: dErr } = await supabase
+  const { data: rows } = await supabase
     .from('drinks')
     .select('user_id, price_at_purchase, products(price)');
-  if (dErr) throw dErr;
 
-  // reduce per user
   const sumByUser = new Map();
   const countByUser = new Map();
+
   (rows || []).forEach((r) => {
     const price = Number(r?.price_at_purchase ?? r?.products?.price ?? 0);
     const uid = r.user_id;
@@ -67,7 +61,6 @@ async function renderOpenBalances() {
     return toast('❌ Kan openstaande saldi niet berekenen');
   }
 
-  // Admin: toon knop om de globale betaallink te beheren
   const controls = document.querySelector('.saldi-controls');
   const existingBtn = document.getElementById('pb-set-global-link');
   if (ADMIN_MODE && controls && !existingBtn) {
@@ -110,7 +103,7 @@ async function renderOpenBalances() {
 }
 
 /* ---------------------------
- * Admin-modus (PIN 0000)
+ * Admin-modus
  * --------------------------- */
 function toggleAdminMode() {
   if (!ADMIN_MODE) {
@@ -123,114 +116,65 @@ function toggleAdminMode() {
   renderOpenBalances();
 }
 
-// Markeer als betaald: insert in payments en drinks wissen
+// Betaald-knop
 window.pbMarkPaid = async (userId) => {
-  // herbereken bedrag i.p.v. uit tabel te vertrouwen
   const balances = await computeOpenBalances('');
   const entry = balances.find((b) => b.id === userId);
   const amount = entry?.amount || 0;
   if (!(amount > 0)) return toast('Geen openstaand saldo');
 
-  // Insert zonder ext_ref
   const { error: pErr } = await supabase
     .from('payments')
     .insert([{ user_id: userId, amount }]);
-  if (pErr) {
-    console.error(pErr);
-    return toast('❌ Betaling registreren mislukt');
-  }
+  if (pErr) return toast('❌ Betaling registreren mislukt');
 
-  // Alle onbetaalde drankjes van deze user wissen
   const { error: dErr } = await supabase.from('drinks').delete().eq('user_id', userId);
-  if (dErr) {
-    console.error(dErr);
-    return toast('⚠️ Betaling opgeslagen, maar drankjes niet gewist');
-  }
+  if (dErr) return toast('⚠️ Betaling opgeslagen, maar drankjes niet gewist');
 
   toast(`✅ Betaald: ${euro(amount)}`);
   await renderOpenBalances();
 };
 
 /* ---------------------------
- * Globale betaallink + fallback naar PayTo
+ * Globale betaallink
  * --------------------------- */
 
-// IBAN fallback (PayTo)
-const BANK_IBAN = 'NL00BANK0123456789'; // <-- zet hier jouw IBAN
-const DESC_BASE = 'Drankjes koelkast';
-
-function buildPaytoLink(name, amount) {
-  const euroStr = Number(amount || 0).toFixed(2);
-  const params = new URLSearchParams({
-    amount: euroStr,
-    message: `${DESC_BASE} – ${name}`,
-  });
-  return `payto://iban/${BANK_IBAN}?${params.toString()}`;
-}
-
-// Laden van de globale link (probeer 'settings', anders 'payment_links' met 1 rij)
 async function loadGlobalPayLink() {
   try {
-    const { data: sdata, error: serr } = await supabase
-      .from('settings')
-      .select('key, value')
-      .eq('key', 'global_paylink')
-      .maybeSingle();
-    if (!serr && sdata?.value) {
-      GLOBAL_PAYLINK = String(sdata.value);
-      return;
-    }
-  } catch (_) {}
-  try {
-    const { data: pdata, error: perr } = await supabase
+    const { data, error } = await supabase
       .from('payment_links')
-      .select('url')
-      .limit(1);
-    if (!perr && Array.isArray(pdata) && pdata[0]?.url) {
-      GLOBAL_PAYLINK = String(pdata[0].url);
+      .select('link, timestamp')
+      .order('timestamp', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!error && data?.link) {
+      GLOBAL_PAYLINK = String(data.link);
+      console.log('[global_paylink]', GLOBAL_PAYLINK);
+      console.log('[laatste wijziging]', data.timestamp);
       return;
     }
-  } catch (_) {}
+  } catch (err) {
+    console.warn('[global_paylink] tabel niet gevonden:', err.message);
+  }
   GLOBAL_PAYLINK = null;
 }
 
-// Admin: instellen/wijzigen/verwijderen van de globale link
 window.pbSetGlobalPayLink = async () => {
   const current = GLOBAL_PAYLINK || '';
   const url = prompt('Voer de OPEN betaallink in (leeg = verwijderen):', current);
-  if (url === null) return; // geannuleerd
+  if (url === null) return;
 
   try {
     if ((url || '').trim() === '') {
-      // verwijderen uit settings
-      let ok = false;
-      try {
-        const { error } = await supabase.from('settings')
-          .delete()
-          .eq('key', 'global_paylink');
-        if (!error) ok = true;
-      } catch (_) {}
-      // fallback: payment_links leegmaken
-      if (!ok) {
-        try { await supabase.from('payment_links').delete().neq('url', null); } catch (_) {}
-      }
+      await supabase.from('payment_links').delete().neq('id', null);
       GLOBAL_PAYLINK = null;
       toast('🔗 Betaallink verwijderd');
     } else {
       const clean = url.trim();
-      // upsert in settings
-      let ok = false;
-      try {
-        const { error } = await supabase.from('settings')
-          .upsert({ key: 'global_paylink', value: clean }, { onConflict: 'key' });
-        if (!error) ok = true;
-      } catch (_) {}
-      // fallback: payment_links met één rij
-      if (!ok) {
-        await supabase.from('payment_links').delete().neq('url', null);
-        const { error } = await supabase.from('payment_links').insert([{ url: clean }]);
-        if (error) throw error;
-      }
+      await supabase.from('payment_links').delete().neq('id', null);
+      const { error } = await supabase.from('payment_links').insert([{ link: clean }]);
+      if (error) throw error;
       GLOBAL_PAYLINK = clean;
       toast('🔗 Betaallink opgeslagen');
     }
@@ -239,19 +183,16 @@ window.pbSetGlobalPayLink = async () => {
     return toast('❌ Betaallink instellen mislukt');
   }
 
-  // update knoplabel in controls
   const btn = document.getElementById('pb-set-global-link');
   if (btn) btn.textContent = GLOBAL_PAYLINK ? '🔗 Betaallink wijzigen' : '🔗 Betaallink instellen';
 };
 
-// Betalen-knop: eerst globale link, anders IBAN PayTo fallback
+// Betalen-knop: opent de open-betaallink
 window.pbPayto = (userId, name, amount) => {
-  const direct = GLOBAL_PAYLINK;
-  if (direct) {
-    try { window.location.href = direct; return; }
-    catch { /* val door naar PayTo */ }
+  if (GLOBAL_PAYLINK) {
+    try { window.location.href = GLOBAL_PAYLINK; return; }
+    catch { toast('⚠️ Kon betaallink niet openen'); }
+  } else {
+    toast('⚠️ Geen open betaallink ingesteld');
   }
-  const url = buildPaytoLink(name, amount);
-  try { window.location.href = url; }
-  catch { toast('⚠️ Kon betaallink niet openen'); }
 };
