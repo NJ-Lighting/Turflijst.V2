@@ -7,17 +7,28 @@
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/css/nav.css" />
 </head>
 <body class="bg-train">
+  <!-- Consistente hamburger navigatie -->
+  <header class="site-nav" role="banner">
+    <button class="nav-toggle" aria-controls="nav-drawer" aria-expanded="false" aria-label="Menu openen">☰</button>
+    <nav id="nav-drawer" class="nav-drawer" role="navigation" aria-label="Hoofdnavigatie">
+      <!-- Hoofdlinks (nav.js verplaatst admin-sectie onder wachtwoord) -->
+      <a href="/index.html">Home</a>
+      <a href="/history.html">History</a>
+      <a href="/new-user.html">New User</a>
+      <a href="/admin.html">Admin</a>
+      <!-- Admin-bestemmingen; nav.js verplaatst deze naar beveiligde submenu na wachtwoord -->
+      <a href="/admin.html">→ Admin pagina</a>
+      <a href="/stock.html">→ Voorraad pagina</a>
+      <a href="/finance.html">→ Finance pagina</a>
+      <a href="/payment.html" aria-current="page">→ Payment pagina</a>
+    </nav>
+  </header>
+
   <div class="content-wrapper">
     <h1>💳 Betalingen</h1>
-
-    <div style="margin-bottom:6px">
-      <button class="btn" onclick="location.href='./index.html'">🏠 Terug naar start</button>
-      <button class="btn" onclick="location.href='./finance.html'">📊 Finance</button>
-      <button class="btn" onclick="location.href='./history.html'">📜 Geschiedenis</button>
-      <button class="btn" onclick="location.href='./admin.html'">🔐 Admin</button>
-    </div>
 
     <!-- V1: Openstaande saldi (bovenaan) -->
     <h2>Openstaande saldi</h2>
@@ -57,6 +68,7 @@
     </table>
   </div>
 
+  <script defer src="/js/nav.js"></script>
   <script type="module" src="/js/pages/payment.page.js"></script>
 </body>
 </html>
