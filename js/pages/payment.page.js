@@ -72,8 +72,6 @@ async function renderOpenBalances() {
 
       const actions = `
         <button class="btn btn-small" onclick="pbPayto('${uid}','${name}', ${amountNum.toFixed(2)})">PayTo</button>
-        <button class="btn btn-small" onclick="pbShowQR('${uid}','${name}', ${amountNum.toFixed(2)})">QR</button>
-        <button class="btn btn-small" onclick="pbCopyLink('${uid}','${name}', ${amountNum.toFixed(2)})">Kopieer link</button>
         ${ADMIN_MODE ? `<button class="btn btn-small" onclick="pbMarkPaid('${uid}')">✅ Betaald</button>` : ''}
       `;
 
@@ -113,7 +111,7 @@ window.pbMarkPaid = async (userId) => {
   const amount = entry?.amount || 0;
   if (!(amount > 0)) return toast('Geen openstaand saldo');
 
-  // Insert zonder ext_ref (kolom bestaat niet in jouw schema)
+  // Insert zonder extra velden
   const { error: pErr } = await supabase
     .from('payments')
     .insert([{ user_id: userId, amount }]);
@@ -134,12 +132,10 @@ window.pbMarkPaid = async (userId) => {
 };
 
 /* ---------------------------
- * PayTo / QR / Link
+ * PayTo
  * --------------------------- */
 
-const BANK_NAME = 'NJ-Lighting';
 const BANK_IBAN = 'NL00BANK0123456789'; // <-- zet hier jouw IBAN
-const BANK_BIC = 'BANKNL2A';            // <-- optioneel; voor EPC QR
 const DESC_BASE = 'Drankjes koelkast';
 
 function buildPaytoLink(name, amount) {
@@ -151,25 +147,6 @@ function buildPaytoLink(name, amount) {
   return `payto://iban/${BANK_IBAN}?${params.toString()}`;
 }
 
-function buildEpcPayload(name, amount) {
-  // EPC069-12 (SEPA QR) payload
-  const amt = Number(amount || 0).toFixed(2);
-  const lines = [
-    'BCD',
-    '001',
-    '1',
-    'SCT',
-    BANK_BIC || '',
-    BANK_NAME,
-    BANK_IBAN,
-    `EUR${amt}`,
-    '',
-    `${DESC_BASE} - ${name}`,
-    ''
-  ];
-  return lines.join('\n');
-}
-
 window.pbPayto = (userId, name, amount) => {
   const url = buildPaytoLink(name, amount);
   try {
@@ -178,24 +155,3 @@ window.pbPayto = (userId, name, amount) => {
     toast('⚠️ Kon PayTo link niet openen');
   }
 };
-
-window.pbCopyLink = async (userId, name, amount) => {
-  const url = buildPaytoLink(name, amount);
-  try {
-    await navigator.clipboard.writeText(url);
-    toast('🔗 Link gekopieerd');
-  } catch {
-    toast('⚠️ Kopiëren mislukt');
-  }
-};
-
-window.pbShowQR = async (userId, name, amount) => {
-  const payload = buildEpcPayload(name, amount);
-  const pre = $('#qr-payload');
-  const lbl = $('#qr-label');
-  if (lbl) lbl.textContent = `${name} – ${euro(amount)}`;
-  if (pre) pre.textContent = payload;
-  $('#qr-modal')?.showModal?.();
-};
-
-window.pbCloseQR = () => $('#qr-modal')?.close?.();
