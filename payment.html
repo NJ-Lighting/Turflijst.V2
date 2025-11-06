@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/css/nav.css" />
 </head>
 <body class="bg-train">
+  <!-- Navigatie -->
   <header class="site-nav" role="banner">
     <button class="nav-toggle" aria-controls="nav-drawer" aria-expanded="false" aria-label="Menu openen">☰</button>
     <nav id="nav-drawer" class="nav-drawer" role="navigation" aria-label="Hoofdnavigatie">
@@ -29,17 +30,19 @@
 
     <section class="saldi-section">
       <h2>Openstaande saldi</h2>
+
       <div class="saldi-controls">
         <input id="pb-search" class="select" type="search" placeholder="🔍 Zoek gebruiker…" />
         <button class="btn" id="pb-admin">🔧 Admin-modus</button>
       </div>
-      <table class="table compact" id="saldi-table">
+
+      <table class="table" id="saldi-table">
         <thead>
           <tr>
             <th>Gebruiker</th>
             <th>Aantal</th>
             <th>Openstaand (€)</th>
-            <th>Actie</th>
+            <th>Acties</th>
           </tr>
         </thead>
         <tbody id="pb-rows"></tbody>
