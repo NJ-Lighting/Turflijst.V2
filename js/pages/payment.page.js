@@ -16,14 +16,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // V1: openstaande saldi + tools
   await renderOpenBalances();
-
   // events voor zoek/admin
   $('#pb-search')?.addEventListener('input', renderOpenBalances);
   $('#pb-admin')?.addEventListener('click', toggleAdminMode);
 });
 
 // expose voor inline onclick uit payments-tabel
-window.deletePayment = (id) => deletePayment(id, () => loadPayments('#p-rows', '#p-filter-user'));
+window.deletePayment = (id) =>
+  deletePayment(id, () => loadPayments('#p-rows', '#p-filter-user'));
 
 /* ---------------------------
  * Openstaande saldi (V1)
@@ -31,70 +31,86 @@ window.deletePayment = (id) => deletePayment(id, () => loadPayments('#p-rows', '
 
 let ADMIN_MODE = false;
 
-async function computeOpenBalances(searchTerm=''){
+async function computeOpenBalances(searchTerm = '') {
   // users
   const { data: users, error: uErr } = await supabase
-    .from('users').select('id, name').order('name', { ascending: true });
+    .from('users')
+    .select('id, name')
+    .order('name', { ascending: true });
   if (uErr) throw uErr;
 
-  // drinks × products.price
+  // drinks: som op basis van historische kostprijs
   const { data: rows, error: dErr } = await supabase
-    .from('drinks').select('user_id, products(price)');
+    .from('drinks')
+    .select('user_id, price_at_purchase');
   if (dErr) throw dErr;
 
   // reduce per user
   const sumByUser = new Map();
   const countByUser = new Map();
-  (rows||[]).forEach(r => {
-    const price = r?.products?.price || 0;
+  (rows || []).forEach((r) => {
+    const price = Number(r?.price_at_purchase) || 0;
     const uid = r.user_id;
     sumByUser.set(uid, (sumByUser.get(uid) || 0) + price);
     countByUser.set(uid, (countByUser.get(uid) || 0) + 1);
   });
 
   const q = (searchTerm || '').trim().toLowerCase();
-  return (users||[])
-    .map(u => ({
+  return (users || [])
+    .map((u) => ({
       id: u.id,
       name: u.name,
       amount: sumByUser.get(u.id) || 0,
       count: countByUser.get(u.id) || 0,
     }))
-    .filter(u => !q || String(u.name || '').toLowerCase().includes(q))
-    .filter(u => u.amount > 0) // alleen wie echt iets open heeft
-    .sort((a,b) => a.name.localeCompare(b.name));
+    .filter((u) => !q || String(u.name || '').toLowerCase().includes(q))
+    .filter((u) => u.amount > 0) // alleen wie echt iets open heeft
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-async function renderOpenBalances(){
+async function renderOpenBalances() {
   const search = $('#pb-search')?.value || '';
   let list = [];
   try {
     list = await computeOpenBalances(search);
-  } catch(err){
+  } catch (err) {
     console.error(err);
     return toast('❌ Kan openstaande saldi niet berekenen');
   }
 
-  const rows = list.map(u => `
-    <tr data-user="${esc(u.id)}">
-      <td>${esc(u.name)}</td>
-      <td style="text-align:right">${euro(u.amount)} <small class="muted">(${u.count})</small></td>
-      <td class="nowrap">
-        <button class="btn" onclick="pbPayto(${u.id}, '${esc(u.name)}', ${Number(u.amount).toFixed(2)})">PayTo</button>
-        <button class="btn" onclick="pbShowQR(${u.id}, '${esc(u.name)}', ${Number(u.amount).toFixed(2)})">QR</button>
-        <button class="btn" onclick="pbCopyLink(${u.id}, '${esc(u.name)}', ${Number(u.amount).toFixed(2)})">Kopieer link</button>
-        ${ADMIN_MODE ? `<button class="btn warn" onclick="pbMarkPaid(${u.id})">✅ Betaald</button>` : ''}
-      </td>
-    </tr>
-  `).join('');
+  const rowsHtml = list
+    .map((u) => {
+      const uid = esc(u.id);
+      const name = esc(u.name);
+      const amountNum = Number(u.amount) || 0;
+      const amount = euro(amountNum);
+      const count = String(u.count);
 
-  if ($('#pb-rows')) $('#pb-rows').innerHTML = rows || '<tr><td colspan="3" class="muted">Geen resultaten</td></tr>';
+      const actions = `
+        <button class="btn btn-small" onclick="pbPayto('${uid}','${name}', ${amountNum.toFixed(2)})">PayTo</button>
+        <button class="btn btn-small" onclick="pbShowQR('${uid}','${name}', ${amountNum.toFixed(2)})">QR</button>
+        <button class="btn btn-small" onclick="pbCopyLink('${uid}','${name}', ${amountNum.toFixed(2)})">Kopieer link</button>
+        ${ADMIN_MODE ? `<button class="btn btn-small" onclick="pbMarkPaid('${uid}')">✅ Betaald</button>` : ''}
+      `;
+
+      return `
+        <tr>
+          <td>${name}</td>
+          <td>${count}</td>
+          <td>${amount}</td>
+          <td>${actions}</td>
+        </tr>`;
+    })
+    .join('');
+
+  if ($('#pb-rows'))
+    $('#pb-rows').innerHTML = rowsHtml || '<tr><td colspan="4">Geen resultaten</td></tr>';
 }
 
 /* ---------------------------
  * Admin-modus (PIN 0000)
  * --------------------------- */
-function toggleAdminMode(){
+function toggleAdminMode() {
   if (!ADMIN_MODE) {
     const pin = prompt('Voer admin-PIN in:');
     if (pin !== '0000') return toast('❌ Onjuiste PIN');
@@ -109,16 +125,24 @@ function toggleAdminMode(){
 window.pbMarkPaid = async (userId) => {
   // herbereken bedrag i.p.v. uit tabel te vertrouwen
   const balances = await computeOpenBalances('');
-  const entry = balances.find(b => b.id === userId);
+  const entry = balances.find((b) => b.id === userId);
   const amount = entry?.amount || 0;
   if (!(amount > 0)) return toast('Geen openstaand saldo');
 
   const extRef = `paypage-${userId}-${Date.now()}`;
-  const { error: pErr } = await supabase.from('payments').insert([{ user_id: userId, amount, ext_ref: extRef }]);
-  if (pErr) { console.error(pErr); return toast('❌ Betaling registreren mislukt'); }
+  const { error: pErr } = await supabase
+    .from('payments')
+    .insert([{ user_id: userId, amount, ext_ref: extRef }]);
+  if (pErr) {
+    console.error(pErr);
+    return toast('❌ Betaling registreren mislukt');
+  }
 
   const { error: dErr } = await supabase.from('drinks').delete().eq('user_id', userId);
-  if (dErr) { console.error(dErr); return toast('⚠️ Betaling opgeslagen, maar drankjes niet gewist'); }
+  if (dErr) {
+    console.error(dErr);
+    return toast('⚠️ Betaling opgeslagen, maar drankjes niet gewist');
+  }
 
   toast(`✅ Betaald: ${euro(amount)}`);
   await renderOpenBalances();
@@ -131,22 +155,23 @@ window.pbMarkPaid = async (userId) => {
 
 // Stel je IBAN/naam/omschrijving samen:
 const BANK_NAME = 'NJ-Lighting';
-const BANK_IBAN = 'NL00BANK0123456789';     // <-- zet hier jouw IBAN
-const BANK_BIC  = 'BANKNL2A';               // <-- optioneel; voor EPC QR
-const DESC_BASE = 'Drankjes koelkast';      // basisomschrijving
+const BANK_IBAN = 'NL00BANK0123456789'; // <-- zet hier jouw IBAN
+const BANK_BIC = 'BANKNL2A';            // <-- optioneel; voor EPC QR
+const DESC_BASE = 'Drankjes koelkast';  // basisomschrijving
 
-function buildPaytoLink(name, amount){
+function buildPaytoLink(name, amount) {
   const euroStr = Number(amount || 0).toFixed(2);
   const params = new URLSearchParams({
     amount: euroStr,
-    message: `${DESC_BASE} – ${name}`
+    message: `${DESC_BASE} – ${name}`,
   });
   return `payto://iban/${BANK_IBAN}?${params.toString()}`;
 }
 
-function buildEpcPayload(name, amount){
+function buildEpcPayload(name, amount) {
   // EPC069-12 (SEPA QR) payload
-  // Service tag, version, character set, identification, BIC (opt), name, IBAN, amount, purpose (opt), remittance (free text), info (opt)
+  // Service tag, version, character set, identification, BIC (opt), name, IBAN,
+  // amount, purpose (opt), remittance (free text), info (opt)
   const amt = Number(amount || 0).toFixed(2);
   const lines = [
     'BCD',
@@ -159,7 +184,7 @@ function buildEpcPayload(name, amount){
     `EUR${amt}`,
     '', // purpose
     `${DESC_BASE} - ${name}`,
-    ''  // info
+    '' // info
   ];
   return lines.join('\n');
 }
@@ -185,9 +210,7 @@ window.pbCopyLink = async (userId, name, amount) => {
 
 window.pbShowQR = async (userId, name, amount) => {
   const payload = buildEpcPayload(name, amount);
-  // Gebruik <dialog id="qr-modal"><img id="qr-img">…</dialog> in je HTML.
-  // Hier genereren we een QR via third-party lib niet in repo; daarom gebruiken we data: URL met een eenvoudige API-call niet.
-  // Simpele fallback: toon payload als <pre> zodat je extern een QR kunt genereren.
+  // Simpele fallback: toon payload in een <pre id="qr-payload"> in je HTML (modal).
   const pre = $('#qr-payload');
   const lbl = $('#qr-label');
   if (lbl) lbl.textContent = `${name} – ${euro(amount)}`;
