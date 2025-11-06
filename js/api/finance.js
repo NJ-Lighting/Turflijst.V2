@@ -44,7 +44,7 @@ export async function loadOpenBalances(tableSel, searchSel) {
       if (amountStr === null) return;
       const amt = Number(String(amountStr).replace(',', '.'));
       if (!Number.isFinite(amt) || amt <= 0) return toast('⚠️ Ongeldig bedrag');
-      await sendPaymentRequest(userId, amt, { method: 'Tikkie' });
+      await sendPaymentRequest(userId, amt);
       toast('✉️ Betaalverzoek verstuurd');
       await loadOpenBalances(tableSel, searchSel);
       await loadPayments({ listAllSel: '#p-rows', listSentSel: '#p-sent-rows', listConfirmedSel: '#p-confirmed-rows', filterUserSel: '#p-filter-user' });
@@ -61,7 +61,7 @@ export async function loadOpenBalances(tableSel, searchSel) {
 export async function loadPayments({ listAllSel, listSentSel, listConfirmedSel, filterUserSel } = {}) {
   const userId = filterUserSel && $(filterUserSel)?.value || '';
   let q = supabase.from('payments')
-    .select('id, user_id, users(name), amount, method, note, status, request_sent_at, confirmed_at, created_at')
+    .select('id, user_id, users(name), amount, status, request_sent_at, confirmed_at, created_at')
     .order('created_at', { ascending: false });
   if (userId) q = q.eq('user_id', userId);
 
@@ -96,8 +96,6 @@ export async function loadPayments({ listAllSel, listSentSel, listConfirmedSel, 
       <tr>
         <td>${esc(name)}</td>
         <td class="right">${euro(p.amount || 0)}</td>
-        <td>${esc(p.method || '')}</td>
-        <td>${esc(p.note || '')}</td>
         <td>${statusLabel}</td>
         <td>${when}</td>
         <td>
@@ -119,8 +117,6 @@ export async function loadPayments({ listAllSel, listSentSel, listConfirmedSel, 
       <tr>
         <td>${esc(name)}</td>
         <td class="right">${euro(p.amount || 0)}</td>
-        <td>${esc(p.method || '')}</td>
-        <td>${esc(p.note || '')}</td>
         <td>✉️ Verstuurd op ${new Date(p.request_sent_at).toLocaleString('nl-NL')}</td>
         <td>—</td>
         <td>
@@ -137,8 +133,6 @@ export async function loadPayments({ listAllSel, listSentSel, listConfirmedSel, 
       <tr>
         <td>${esc(name)}</td>
         <td class="right">${euro(p.amount || 0)}</td>
-        <td>${esc(p.method || '')}</td>
-        <td>${esc(p.note || '')}</td>
         <td>✅ Betaald</td>
         <td>${new Date(p.confirmed_at).toLocaleString('nl-NL')}</td>
         <td><button class="btn btn-warn" data-del-id="${p.id}">Verwijderen</button></td>
@@ -146,7 +140,6 @@ export async function loadPayments({ listAllSel, listSentSel, listConfirmedSel, 
     `;
   }
 
-  // kleine helpers op window
   if (typeof window !== 'undefined') {
     window.uiMarkPaid = async (id) => { await confirmPayment(id); await loadPayments({ listAllSel, listSentSel, listConfirmedSel, filterUserSel }); };
     window.uiCancel   = async (id) => { await cancelPayment(id); await loadPayments({ listAllSel, listSentSel, listConfirmedSel, filterUserSel }); };
@@ -154,16 +147,15 @@ export async function loadPayments({ listAllSel, listSentSel, listConfirmedSel, 
 }
 
 // === Payments actions ===
-export async function sendPaymentRequest(userId, amount, { note = '', method = 'Tikkie' } = {}) {
+export async function sendPaymentRequest(userId, amount) {
   const { error } = await supabase.from('payments').insert([{
-    user_id: userId, amount, method, note,
+    user_id: userId, amount,
     status: 'sent', request_sent_at: new Date().toISOString()
   }]);
   if (error) throw error;
 }
 
 export async function confirmPayment(paymentId) {
-  // 1) Haal payment + user op
   const { data: pRows, error: pErr } = await supabase
     .from('payments')
     .select('id, user_id, amount, status')
@@ -174,7 +166,6 @@ export async function confirmPayment(paymentId) {
   if (!p) throw new Error('Payment niet gevonden');
   if (p.status === 'cancelled') throw new Error('Payment is geannuleerd');
 
-  // 2) Openstaand totaal
   const { data: drinks, error: dErr } = await supabase
     .from('drinks')
     .select('id, price_at_purchase, paid')
@@ -183,7 +174,6 @@ export async function confirmPayment(paymentId) {
   if (dErr) throw dErr;
   const openTotal = (drinks || []).reduce((s, r) => s + toNumber(r.price_at_purchase), 0);
 
-  // 3) Zet onbetaalde drankjes op betaald
   if (openTotal > 0) {
     let { error: updErr } = await supabase
       .from('drinks')
@@ -193,7 +183,6 @@ export async function confirmPayment(paymentId) {
     if (updErr) throw updErr;
   }
 
-  // 4) Payment op confirmed
   const confirmedAt = new Date().toISOString();
   const { error: cErr } = await supabase
     .from('payments')
@@ -210,8 +199,7 @@ export async function cancelPayment(paymentId) {
   if (error) throw error;
 }
 
-export async function addDirectPayment(userId, amount, { note = '', method = 'contant' } = {}) {
-  // Directe betaling → confirmed en drankjes afboeken
+export async function addDirectPayment(userId, amount) {
   const { data: drinks, error: dErr } = await supabase
     .from('drinks')
     .select('id, price_at_purchase, paid')
@@ -230,7 +218,7 @@ export async function addDirectPayment(userId, amount, { note = '', method = 'co
   }
 
   const { error } = await supabase.from('payments').insert([{
-    user_id: userId, amount: openTotal || amount, method, note, status: 'confirmed',
+    user_id: userId, amount: openTotal || amount, status: 'confirmed',
     confirmed_at: new Date().toISOString()
   }]);
   if (error) throw error;
@@ -246,15 +234,14 @@ function toNumber(x) {
   return Number.isFinite(n) ? n : 0;
 }
 
-// -------------------- NIEUW: finance.page.js dependencies --------------------
+// -------------------- Finance-page dependencies --------------------
 export async function addPayment(userSel, amountSel, noteSel, onDone) {
   const userId = userSel && $(userSel)?.value || '';
   const amountStr = amountSel && $(amountSel)?.value || '';
-  const note = (noteSel && $(noteSel)?.value?.trim()) || '';
   const amount = Number(String(amountStr).replace(',', '.'));
   if (!userId) return toast('⚠️ Kies een gebruiker');
   if (!Number.isFinite(amount) || amount <= 0) return toast('⚠️ Ongeldig bedrag');
-  await sendPaymentRequest(userId, amount, { note, method: 'Tikkie' });
+  await sendPaymentRequest(userId, amount);
   if (onDone) await onDone();
   if (amountSel && $(amountSel)) $(amountSel).value = '';
   if (noteSel && $(noteSel)) $(noteSel).value = '';
@@ -263,13 +250,15 @@ export async function addPayment(userSel, amountSel, noteSel, onDone) {
 
 export async function addDeposit(amountSel, noteSel, onDone) {
   const amountStr = amountSel && $(amountSel)?.value || '';
-  const note = (noteSel && $(noteSel)?.value?.trim()) || '';
   const amount = Number(String(amountStr).replace(',', '.'));
+  const note = (noteSel && $(noteSel)?.value?.trim()) || null; // genegeerd als kolom niet bestaat
   if (!Number.isFinite(amount) || amount <= 0) return toast('⚠️ Ongeldig bedrag');
 
-  const { error } = await supabase.from('deposits').insert([{
-    amount, note, created_at: new Date().toISOString()
-  }]);
+  const payload = { amount, created_at: new Date().toISOString() };
+  // alleen meesturen als je een 'note' kolom hebt:
+  if (note) payload.note = note;
+
+  const { error } = await supabase.from('deposits').insert([payload]);
   if (error) { console.error('[addDeposit] error', error); return toast('❌ Fout bij opslaan'); }
 
   if (amountSel && $(amountSel)) $(amountSel).value = '';
