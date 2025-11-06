@@ -2,13 +2,11 @@
 import { $, euro, esc, toast } from '../core.js';
 import { supabase } from '../supabase.client.js';
 
-let GLOBAL_PAYLINK = null;     // string | null
-let GLOBAL_UPDATED_AT = null;  // timestamptz | null
+let GLOBAL_PAYLINK = null; // string | null
 
 document.addEventListener('DOMContentLoaded', async () => {
-  await loadGlobalPayLink();   // laad globale open betaallink (payment_links)
-  await renderOpenBalances();  // render saldi & infobalk
-
+  await loadGlobalPayLink(); // laad betaallink via view_payment_link_latest
+  await renderOpenBalances();
   $('#pb-search')?.addEventListener('input', renderOpenBalances);
   $('#pb-admin')?.addEventListener('click', toggleAdminMode);
 });
@@ -16,7 +14,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 /* ---------------------------
  * Openstaande saldi
  * --------------------------- */
-
 let ADMIN_MODE = false;
 
 async function computeOpenBalances(searchTerm = '') {
@@ -55,11 +52,20 @@ async function computeOpenBalances(searchTerm = '') {
 async function renderOpenBalances() {
   const search = $('#pb-search')?.value || '';
   let list = [];
-  try {
-    list = await computeOpenBalances(search);
-  } catch (err) {
-    console.error(err);
-    return toast('❌ Kan openstaande saldi niet berekenen');
+  try { list = await computeOpenBalances(search); }
+  catch (err) { console.error(err); return toast('❌ Kan openstaande saldi niet berekenen'); }
+
+  const controls = document.querySelector('.saldi-controls');
+  const existingBtn = document.getElementById('pb-set-global-link');
+  if (ADMIN_MODE && controls && !existingBtn) {
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.id = 'pb-set-global-link';
+    btn.textContent = GLOBAL_PAYLINK ? ' Betaallink wijzigen' : ' Betaallink instellen';
+    btn.addEventListener('click', () => pbSetGlobalPayLink());
+    controls.appendChild(btn);
+  } else if (!ADMIN_MODE && existingBtn) {
+    existingBtn.remove();
   }
 
   const rowsHtml = list
@@ -69,44 +75,25 @@ async function renderOpenBalances() {
       const amountNum = Number(u.amount) || 0;
       const amount = euro(amountNum);
       const count = String(u.count);
-
+      const actions = `
+        <button class="btn btn-small" onclick="pbPayto('${uid}','${name}', ${amountNum.toFixed(2)})">Betalen</button>
+        ${ADMIN_MODE ? `<button class="btn btn-small" onclick="pbMarkPaid('${uid}')">✅ Betaald</button>` : ''}
+      `;
       return `
         <tr>
           <td>${name}</td>
           <td>${count}</td>
           <td>${amount}</td>
-          <td>
-            <button class="btn btn-small"
-              onclick="pbPayto('${uid}','${name}', ${amountNum.toFixed(2)})">Betalen</button>
-            ${ADMIN_MODE ? `<button class="btn btn-small" onclick="pbMarkPaid('${uid}')">✅ Betaald</button>` : ''}
-          </td>
+          <td>${actions}</td>
         </tr>`;
     })
     .join('');
 
-  if ($('#pb-rows'))
-    $('#pb-rows').innerHTML = rowsHtml || '<tr><td colspan="4">Geen resultaten</td></tr>';
-
-  // Infobalk boven de tabel (alleen admin)
-  const infoEl = document.getElementById('global-link-info');
-  if (infoEl) {
-    if (ADMIN_MODE && GLOBAL_PAYLINK) {
-      const ts = GLOBAL_UPDATED_AT
-        ? new Date(GLOBAL_UPDATED_AT).toLocaleString('nl-NL', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit'
-          })
-        : 'onbekend tijdstip';
-      infoEl.textContent = `🔗 Actieve betaallink ingesteld op ${ts}`;
-      infoEl.style.display = 'block';
-    } else {
-      infoEl.style.display = 'none';
-    }
-  }
+  if ($('#pb-rows')) $('#pb-rows').innerHTML = rowsHtml || '<tr><td colspan="4">Geen resultaten</td></tr>';
 }
 
 /* ---------------------------
- * Admin-modus (PIN 0000)
+ * Admin-modus
  * --------------------------- */
 function toggleAdminMode() {
   if (!ADMIN_MODE) {
@@ -119,7 +106,7 @@ function toggleAdminMode() {
   renderOpenBalances();
 }
 
-// Markeer als betaald
+// ✅ Betaald
 window.pbMarkPaid = async (userId) => {
   const balances = await computeOpenBalances('');
   const entry = balances.find((b) => b.id === userId);
@@ -129,88 +116,79 @@ window.pbMarkPaid = async (userId) => {
   const { error: pErr } = await supabase
     .from('payments')
     .insert([{ user_id: userId, amount }]);
-  if (pErr) {
-    console.error(pErr);
-    return toast('❌ Betaling registreren mislukt');
-  }
+  if (pErr) return toast('❌ Betaling registreren mislukt');
 
   const { error: dErr } = await supabase.from('drinks').delete().eq('user_id', userId);
-  if (dErr) {
-    console.error(dErr);
-    return toast('⚠️ Betaling opgeslagen, maar drankjes niet gewist');
-  }
+  if (dErr) return toast('⚠️ Betaling opgeslagen, maar drankjes niet gewist');
 
   toast(`✅ Betaald: ${euro(amount)}`);
   await renderOpenBalances();
+
+  // Betaalvlag wissen
+  try { await supabase.from('payment_flags').delete().eq('user_id', userId); } catch {}
 };
 
 /* ---------------------------
- * Globale open betaallink (payment_links)
+ * Betaallink laden via VIEW
  * --------------------------- */
 async function loadGlobalPayLink() {
   try {
     const { data, error } = await supabase
-      .from('payment_links')
+      .from('view_payment_link_latest')
       .select('link, timestamp')
-      .order('timestamp', { ascending: false })
-      .limit(1)
       .maybeSingle();
-
     if (!error && data?.link) {
       GLOBAL_PAYLINK = String(data.link);
-      GLOBAL_UPDATED_AT = data.timestamp ?? null;
+      console.log('[global_paylink]', GLOBAL_PAYLINK);
+      console.log('[laatste wijziging]', data.timestamp);
       return;
     }
   } catch (err) {
-    console.warn('[global_paylink] tabel niet gevonden:', err?.message || err);
+    console.warn('[global_paylink] view niet gevonden:', err.message);
   }
   GLOBAL_PAYLINK = null;
-  GLOBAL_UPDATED_AT = null;
 }
 
 window.pbSetGlobalPayLink = async () => {
   const current = GLOBAL_PAYLINK || '';
   const url = prompt('Voer de OPEN betaallink in (leeg = verwijderen):', current);
   if (url === null) return;
-
   try {
     if ((url || '').trim() === '') {
       await supabase.from('payment_links').delete().neq('id', null);
       GLOBAL_PAYLINK = null;
-      GLOBAL_UPDATED_AT = null;
       toast(' Betaallink verwijderd');
     } else {
       const clean = url.trim();
       await supabase.from('payment_links').delete().neq('id', null);
-      const { data, error } = await supabase
-        .from('payment_links')
-        .insert([{ link: clean }])
-        .select('timestamp')
-        .maybeSingle();
+      const { error } = await supabase.from('payment_links').insert([{ link: clean }]);
       if (error) throw error;
-
       GLOBAL_PAYLINK = clean;
-      GLOBAL_UPDATED_AT = data?.timestamp ?? null;
       toast(' Betaallink opgeslagen');
     }
   } catch (e) {
     console.error(e);
     return toast('❌ Betaallink instellen mislukt');
   }
-
   const btn = document.getElementById('pb-set-global-link');
   if (btn) btn.textContent = GLOBAL_PAYLINK ? ' Betaallink wijzigen' : ' Betaallink instellen';
-
-  // update infobalk direct
-  renderOpenBalances();
 };
 
-// Betalen-knop: open de ingestelde link (ING: gewoon openen)
+// 🔔 Betalen → vlag zetten + link openen
 window.pbPayto = (userId, name, amount) => {
   if (!GLOBAL_PAYLINK) return toast('⚠️ Geen open betaallink ingesteld');
-  try {
-    window.location.href = GLOBAL_PAYLINK;
-  } catch {
-    toast('⚠️ Kon betaallink niet openen');
-  }
+  flagPaymentAttempt(userId).finally(() => {
+    try { window.location.href = GLOBAL_PAYLINK; }
+    catch { toast('⚠️ Kon betaallink niet openen'); }
+  });
 };
+
+async function flagPaymentAttempt(userId) {
+  try {
+    await supabase
+      .from('payment_flags')
+      .upsert({ user_id: userId, attempted_at: new Date().toISOString() }, { onConflict: 'user_id' });
+  } catch (e) {
+    console.warn('[payment_flags] upsert mislukt:', e?.message || e);
+  }
+}
