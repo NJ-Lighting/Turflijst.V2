@@ -11,13 +11,8 @@
   --border: #000;
 }
 
-* {
-  box-sizing: border-box;
-}
-
-html, body {
-  height: 100%;
-}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
 
 body {
   margin: 0;
@@ -53,30 +48,11 @@ body {
   color: #fff;
   transition: transform .2s, background .2s;
 }
-
-.btn:hover {
-  background: var(--green-d);
-  transform: scale(1.07);
-}
-
-.btn.block {
-  display: block;
-  width: min(90%, 250px);
-  margin-inline: auto;
-}
-
-.btn.btn-warn {
-  background: var(--danger);
-}
-
-.btn.btn-warn:hover {
-  background: var(--danger-d);
-}
-
-.btn.ghost {
-  background: #f0f0f0;
-  color: #111;
-}
+.btn:hover { background: var(--green-d); transform: scale(1.07); }
+.btn.block { display: block; width: min(90%, 250px); margin-inline: auto; }
+.btn.btn-warn { background: var(--danger); }
+.btn.btn-warn:hover { background: var(--danger-d); }
+.btn.ghost { background: #f0f0f0; color: #111; }
 
 /* === Inputs & Selects === */
 .select,
@@ -108,23 +84,16 @@ input[type="date"] {
   overflow: hidden;
   border: 2px solid var(--border);
 }
-
-.table th,
-.table td {
+.table th, .table td {
   border: 2px solid var(--border);
   padding: 10px;
   text-align: center;
 }
-
 .table th {
   background: var(--green);
   color: #fff;
 }
-
-.table td.right,
-.table th.right {
-  text-align: right;
-}
+.table td.right, .table th.right { text-align: right; }
 
 /* === Product Grid === */
 .product-grid {
@@ -135,11 +104,7 @@ input[type="date"] {
   max-width: 600px;
   margin-inline: auto;
 }
-
-.product-grid > div {
-  display: flex;
-  justify-content: center;
-}
+.product-grid > div { display: flex; justify-content: center; }
 
 /* === Drink Buttons === */
 .drink-btn {
@@ -157,12 +122,7 @@ input[type="date"] {
   max-width: 250px;
   text-align: left;
 }
-
-.drink-btn:hover {
-  background: var(--green-d);
-  transform: scale(1.07);
-}
-
+.drink-btn:hover { background: var(--green-d); transform: scale(1.07); }
 .drink-btn img {
   height: 40px;
   width: 40px;
@@ -198,67 +158,26 @@ input[type="date"] {
 }
 
 /* === Compact Tables (Finance, etc.) === */
-.table.compact th,
-.table.compact td {
+.table.compact th, .table.compact td {
   padding: 5px 6px;
   line-height: 1.1;
   font-size: 0.85rem;
   border: 1px solid rgba(0, 0, 0, 0.15);
 }
-
 .table.compact th {
   background: var(--green);
   font-weight: bold;
 }
+.table.compact tr { border-bottom: 1px solid rgba(0, 0, 0, 0.1); }
+.table.compact td.right, .table.compact th.right { text-align: right; }
 
-.table.compact tr {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-}
-
-.table.compact td.right,
-.table.compact th.right {
-  text-align: right;
-}
-
-/* === Openstaande saldi (Payment) === */
-.saldi-section {
-  margin: 16px auto 24px auto;
-  background: rgba(0, 0, 0, 0.10);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 10px;
-  padding: 12px;
-  width: 100%;
-  max-width: 1000px;
-}
-
-.saldi-section h2 {
-  margin: 0 0 10px 0;
-  color: var(--text);
-}
-
-.saldi-controls {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
+/* === Info bar (betaallink status) === */
+.link-info-bar {
+  background: rgba(255,255,255,0.1);
+  color: #ddd;
+  font-size: 0.9em;
+  padding: 6px 10px;
+  border-radius: 8px;
   margin-bottom: 10px;
-  flex-wrap: wrap;
-}
-
-#saldi-table {
-  width: 100%;
-}
-
-#saldi-table th,
-#saldi-table td {
-  padding: 10px;
-}
-
-#saldi-table th {
-  background: var(--green);
-  color: #fff;
-}
-
-#saldi-table tr:nth-child(even) td {
-  background: rgba(0, 0, 0, 0.03);
+  text-align: center;
 }
