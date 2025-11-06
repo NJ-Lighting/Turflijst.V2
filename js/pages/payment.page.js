@@ -7,7 +7,7 @@ let PAYMENT_FLAGS = new Map();        // user_id -> attempted_at (ISO)
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadGlobalPayLink();          // via view_payment_link_latest
-  await loadPaymentFlags();           // haal bestaande betaalpogingen
+  await loadPaymentFlags();           // haal bestaande meldingen
   await renderOpenBalances();         // render tabel
 
   $('#pb-search')?.addEventListener('input', renderOpenBalances);
@@ -81,10 +81,13 @@ async function renderOpenBalances() {
 
     const attemptISO = PAYMENT_FLAGS.get(u.id) || null;
     const attemptText = attemptISO
-      ? new Date(attemptISO).toLocaleString('nl-NL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' })
+      ? new Date(attemptISO).toLocaleString('nl-NL', { 
+          day:'2-digit', month:'2-digit', year:'numeric', 
+          hour:'2-digit', minute:'2-digit' 
+        })
       : null;
     const attemptCell = ADMIN_MODE
-      ? (attemptISO ? `✅ <small title="Klik: ${attemptText}">${attemptText}</small>` : '—')
+      ? (attemptISO ? `🕓 <small title="Gemeld op: ${attemptText}">${attemptText}</small>` : '—')
       : '—';
 
     const actions = `
@@ -166,7 +169,7 @@ window.pbSetGlobalPayLink = async () => {
 };
 
 /* ---------------------------
- * Betaalpoging loggen + laden
+ * Betaalmeldingen (flags)
  * --------------------------- */
 async function loadPaymentFlags() {
   try {
