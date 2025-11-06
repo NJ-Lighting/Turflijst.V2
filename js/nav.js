@@ -22,8 +22,7 @@
   });
 
   // --- Admin unlock ---
-  // LET OP: Pas hier jouw gewenste wachtwoord aan.
-  const ADMIN_PASS = 'admin';
+  const ADMIN_PASS = '1915'; // 🔐 jouw wachtwoord
   const LS_KEY = 'turflijst_admin_unlocked';
 
   // Maak/haal admin-sectie (extra rij met knoppen)
@@ -52,8 +51,6 @@
   setAdminVisible(unlocked);
 
   // Intercepteer de bestaande "Admin" link in de bovenste rij:
-  // - Als nog niet ontgrendeld: prompt om wachtwoord; bij succes: ontgrendel + ga naar /admin.html
-  // - Als al ontgrendeld: laat normale navigatie door
   const topAdminLink = Array.from(drawer.querySelectorAll('a')).find(a => {
     const href = (a.getAttribute('href') || '').toLowerCase();
     const text = (a.textContent || '').trim().toLowerCase();
@@ -67,13 +64,11 @@
       e.preventDefault();
       const pwd = window.prompt('Vul het admin-wachtwoord in:');
       if (pwd === null) return; // geannuleerd
-      if (pwd === 1915) {
+      if (pwd === ADMIN_PASS) {
         localStorage.setItem(LS_KEY, '1');
         setAdminVisible(true);
-        // navigeer alsnog naar Admin
         window.location.href = '/admin.html';
       } else {
-        // fallback melding zonder afhankelijkheid van core.js
         alert('Onjuist wachtwoord.');
       }
     }, { passive: false });
