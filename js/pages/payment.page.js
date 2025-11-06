@@ -91,7 +91,7 @@ async function renderOpenBalances() {
       : '—';
 
     const actions = `
-      <button class="btn btn-small" onclick="pbPayto('${uid}','${name}', ${amountNum.toFixed(2)})">Betalen</button>
+      <button class="btn btn-small" onclick="pbPayto(this,'${uid}','${name}', ${amountNum.toFixed(2)})">Betalen</button>
       ${ADMIN_MODE ? `<button class="btn btn-small" onclick="pbMarkPaid('${uid}')">✅ Betaald</button>` : ''}
     `;
 
@@ -198,15 +198,26 @@ async function flagPaymentAttempt(userId) {
 /* ---------------------------
  * Acties
  * --------------------------- */
-window.pbPayto = async (userId, name, amount) => {
+window.pbPayto = async (btn, userId, name, amount) => {
   if (!GLOBAL_PAYLINK) return toast('⚠️ Geen open betaallink ingesteld');
+  try { btn.disabled = true; btn.classList.add('is-busy'); } catch {}
   try {
     await flagPaymentAttempt(userId);
     await loadPaymentFlags();
     await renderOpenBalances();
+
+    const a = document.createElement('a');
+    a.href = GLOBAL_PAYLINK;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch (e) {
+    console.warn('open paylink failed', e);
+    toast(`Klik om te openen: ${GLOBAL_PAYLINK}`);
   } finally {
-    const w = window.open(GLOBAL_PAYLINK, '_blank', 'noopener,noreferrer');
-    if (!w) window.location.href = GLOBAL_PAYLINK;
+    setTimeout(() => { try { btn.disabled = false; btn.classList.remove('is-busy'); } catch {} }, 800);
   }
 };
 
