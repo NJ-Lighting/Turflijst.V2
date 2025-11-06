@@ -1,29 +1,15 @@
 // /js/pages/payment.page.js
 import { $, euro, esc, toast } from '../core.js';
 import { supabase } from '../supabase.client.js';
-import { loadUsersToSelects, loadPayments, addPayment, deletePayment } from '../api/finance.js';
 
+// Alleen saldi-functionaliteit op deze pagina
 document.addEventListener('DOMContentLoaded', async () => {
-  // dropdowns & bestaande payments-lijst (onderaan)
-  await loadUsersToSelects('#p-filter-user', '#p-user');
-  await loadPayments('#p-rows', '#p-filter-user');
-
-  // acties bestaande sectie
-  $('#p-add')?.addEventListener('click', () =>
-    addPayment('#p-user', '#p-amount', '#p-note', () => loadPayments('#p-rows', '#p-filter-user'))
-  );
-  $('#p-filter-user')?.addEventListener('change', () => loadPayments('#p-rows', '#p-filter-user'));
-
   // V1: openstaande saldi + tools
   await renderOpenBalances();
   // events voor zoek/admin
   $('#pb-search')?.addEventListener('input', renderOpenBalances);
   $('#pb-admin')?.addEventListener('click', toggleAdminMode);
 });
-
-// expose voor inline onclick uit payments-tabel
-window.deletePayment = (id) =>
-  deletePayment(id, () => loadPayments('#p-rows', '#p-filter-user'));
 
 /* ---------------------------
  * Openstaande saldi (V1)
@@ -146,7 +132,6 @@ window.pbMarkPaid = async (userId) => {
 
   toast(`✅ Betaald: ${euro(amount)}`);
   await renderOpenBalances();
-  await loadPayments('#p-rows', '#p-filter-user');
 };
 
 /* ---------------------------
@@ -170,8 +155,6 @@ function buildPaytoLink(name, amount) {
 
 function buildEpcPayload(name, amount) {
   // EPC069-12 (SEPA QR) payload
-  // Service tag, version, character set, identification, BIC (opt), name, IBAN,
-  // amount, purpose (opt), remittance (free text), info (opt)
   const amt = Number(amount || 0).toFixed(2);
   const lines = [
     'BCD',
@@ -182,9 +165,9 @@ function buildEpcPayload(name, amount) {
     BANK_NAME,
     BANK_IBAN,
     `EUR${amt}`,
-    '', // purpose
+    '',
     `${DESC_BASE} - ${name}`,
-    '' // info
+    ''
   ];
   return lines.join('\n');
 }

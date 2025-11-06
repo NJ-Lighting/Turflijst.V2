@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Turf Lijst – Betalingen</title>
+  <title>Turf Lijst – Openstaande saldi</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico">
   <link rel="stylesheet" href="/css/app.css" />
@@ -14,12 +14,10 @@
   <header class="site-nav" role="banner">
     <button class="nav-toggle" aria-controls="nav-drawer" aria-expanded="false" aria-label="Menu openen">☰</button>
     <nav id="nav-drawer" class="nav-drawer" role="navigation" aria-label="Hoofdnavigatie">
-      <!-- Hoofdlinks (nav.js verplaatst admin-sectie onder wachtwoord) -->
       <a href="/index.html">Home</a>
       <a href="/history.html">History</a>
       <a href="/new-user.html">New User</a>
       <a href="/admin.html">Admin</a>
-      <!-- Admin-bestemmingen; nav.js verplaatst ze naar beveiligde submenu na wachtwoord -->
       <a href="/admin.html">→ Admin pagina</a>
       <a href="/stock.html">→ Voorraad pagina</a>
       <a href="/finance.html">→ Finance pagina</a>
@@ -28,7 +26,7 @@
   </header>
 
   <div class="content-wrapper">
-    <h1>💳 Betalingen</h1>
+    <h1>💳 Openstaande saldi</h1>
 
     <!-- V1: Openstaande saldi (nette layout + tabel, logica ongewijzigd) -->
     <section class="saldi-section">
@@ -49,35 +47,6 @@
         <tbody id="pb-rows"></tbody>
       </table>
     </section>
-
-    <h2>Betaling registreren</h2>
-    <div>
-      <label for="p-user">Gebruiker</label><br />
-      <select id="p-user" class="select"></select>
-      <label for="p-amount">Bedrag (€)</label><br />
-      <input id="p-amount" class="select" type="number" min="0" step="0.01" placeholder="0,00" />
-      <label for="p-note">Notitie (optioneel)</label><br />
-      <input id="p-note" class="select" type="text" placeholder="bijv. Tikkie 1234" />
-      <button class="btn" id="p-add">➕ Registreren</button>
-    </div>
-
-    <h2>Betalingen</h2>
-    <div>
-      <label for="p-filter-user">Filter op gebruiker</label><br />
-      <select id="p-filter-user" class="select"></select>
-    </div>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Datum</th>
-          <th>Gebruiker</th>
-          <th>Bedrag (€)</th>
-          <th>Notitie</th>
-          <th>Acties</th>
-        </tr>
-      </thead>
-      <tbody id="p-rows"></tbody>
-    </table>
   </div>
 
   <script defer src="/js/nav.js"></script>
