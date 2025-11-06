@@ -7,7 +7,7 @@ let PAYMENT_FLAGS = new Map();       // user_id -> attempted_at (ISO)
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadGlobalPayLink();          // via view_payment_link_latest
-  await loadPaymentFlags();           // betaalmeldingen binnenhalen
+  await loadPaymentFlags();           // meldingen binnenhalen
   await renderOpenBalances();         // tabel tekenen
 
   $('#pb-search')?.addEventListener('input', renderOpenBalances);
@@ -86,8 +86,10 @@ async function renderOpenBalances() {
           hour:'2-digit', minute:'2-digit'
         })
       : null;
-    const attemptCell = ADMIN_MODE
-      ? (attemptISO ? `🕓 <small title="Gemeld op: ${attemptText}">${attemptText}</small>` : '—')
+
+    // Klokje altijd tonen wanneer gemeld
+    const attemptCell = attemptISO
+      ? `🕓 <small title="Gemeld op: ${attemptText}">${attemptText}</small>`
       : '—';
 
     const actions = `
@@ -174,24 +176,38 @@ window.pbSetGlobalPayLink = async () => {
 async function loadPaymentFlags() {
   try {
     PAYMENT_FLAGS.clear();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('payment_flags')
       .select('user_id, attempted_at');
+    if (error) {
+      console.warn('[payment_flags] select error:', error);
+      toast('⚠️ Kan meldingen niet laden (payment_flags)');
+      return;
+    }
     for (const r of (data || [])) PAYMENT_FLAGS.set(r.user_id, r.attempted_at);
   } catch (e) {
     console.warn('[payment_flags] load error:', e?.message || e);
+    toast('⚠️ Fout bij laden meldingen');
   }
 }
 
 async function flagPaymentAttempt(userId) {
   try {
     const ts = new Date().toISOString();
-    await supabase
+    const { error } = await supabase
       .from('payment_flags')
       .upsert({ user_id: userId, attempted_at: ts }, { onConflict: 'user_id' });
+    if (error) {
+      console.warn('[payment_flags] upsert error:', error);
+      toast('⚠️ Melden van betaling mislukt');
+      return false;
+    }
     PAYMENT_FLAGS.set(userId, ts);
+    return true;
   } catch (e) {
     console.warn('[payment_flags] upsert mislukt:', e?.message || e);
+    toast('⚠️ Melden van betaling mislukt');
+    return false;
   }
 }
 
@@ -202,7 +218,7 @@ window.pbPayto = async (btn, userId, name, amount) => {
   if (!GLOBAL_PAYLINK) return toast('⚠️ Geen open betaallink ingesteld');
   try { btn.disabled = true; btn.classList.add('is-busy'); } catch {}
   try {
-    await flagPaymentAttempt(userId);
+    const ok = await flagPaymentAttempt(userId);
     await loadPaymentFlags();
     await renderOpenBalances();
 
