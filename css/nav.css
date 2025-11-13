@@ -22,22 +22,29 @@
   line-height: 1;
   cursor: pointer;
 }
-.nav-toggle:focus-visible { outline: 2px solid rgba(255,255,255,.5); }
+
+.nav-toggle:focus-visible {
+  outline: 2px solid rgba(255,255,255,.5);
+}
 
 /* Drawer paneel (klapt omlaag onder de header) */
 .nav-drawer {
   position: fixed;
   left: 0;
   right: 0;
-  top: 0;           /* we animeren vanaf -100% naar 0 via transform */
+  top: 0;
+
+  /* we animeren vanaf -100% naar 0 via transform */
   transform: translateY(-100%);
   transition: transform .2s ease;
+
   background: rgba(0,0,0,.85);
   backdrop-filter: saturate(1.1) blur(8px);
   padding: .75rem 1rem 1rem 1rem;
   display: flex;
   flex-direction: column;
   gap: .5rem;
+
   border-bottom: 1px solid rgba(255,255,255,.15);
 }
 
@@ -54,14 +61,51 @@
   border-radius: .5rem;
   display: block;
 }
+
 .nav-drawer a:hover,
 .nav-drawer a:focus-visible {
   background: rgba(255,255,255,.1);
 }
+
 .nav-drawer a[aria-current="page"] {
   outline: 2px solid rgba(255,255,255,.35);
   outline-offset: 1px;
 }
 
-/* Ruimte voor de content wanneer drawer open is? 
-   Niet nodig omdat drawer fixed is; content blijft staan. */
+/* ----------------------------------------------------------- */
+/* ADMIN SECTIE (inspringend submenu)                          */
+/* ----------------------------------------------------------- */
+
+#nav-admin-row {
+  border-top: 1px solid rgba(255,255,255,.2);
+  margin-top: .35rem;
+  padding-top: .35rem;
+}
+
+/* Het Admin-item zelf duidelijker */
+#admin-protected {
+  font-weight: 600;
+}
+
+/* Container voor de admin-submenu-links */
+#nav-admin-row .nav-admin-links {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+}
+
+/* Submenu-links ingesprongen */
+#nav-admin-row .nav-admin-links a {
+  padding-left: 1.75rem;
+  font-size: .95rem;
+  position: relative;
+}
+
+/* Klein pijltje voor ingesprongen links */
+#nav-admin-row .nav-admin-links a::before {
+  content: '↳';
+  position: absolute;
+  left: .7rem;
+  opacity: .75;
+  font-size: .85em;
+}
