@@ -100,7 +100,7 @@ async function renderOpenBalances() {
 function toggleAdminMode() {
   if (!ADMIN_MODE) {
     const pin = prompt('Voer admin-PIN in:');
-    if (pin !== '0000') return toast('❌ Onjuiste PIN');
+    if (pin !== '2420') return toast('❌ Onjuiste PIN');
     ADMIN_MODE = true;
   } else ADMIN_MODE = false;
   renderOpenBalances();
