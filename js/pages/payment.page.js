@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadGlobalPayLink();
   await loadPaymentFlags();
   await renderOpenBalances();
-
   $('#pb-search')?.addEventListener('input', renderOpenBalances);
   $('#pb-admin')?.addEventListener('click', toggleAdminMode);
 });
@@ -19,7 +18,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 async function computeOpenBalances(searchTerm = '') {
   const { data: users } = await supabase.from('users').select('id, name').order('name', { ascending: true });
   const { data: rows } = await supabase.from('drinks').select('user_id, price_at_purchase, products(price)');
-  const sumByUser = new Map(), countByUser = new Map();
+
+  const sumByUser = new Map(),
+        countByUser = new Map();
 
   (rows || []).forEach(r => {
     const price = Number(r?.price_at_purchase ?? r?.products?.price ?? 0);
@@ -30,7 +31,12 @@ async function computeOpenBalances(searchTerm = '') {
 
   const q = (searchTerm || '').trim().toLowerCase();
   return (users || [])
-    .map(u => ({ id: u.id, name: u.name, amount: sumByUser.get(u.id) || 0, count: countByUser.get(u.id) || 0 }))
+    .map(u => ({
+      id: u.id,
+      name: u.name,
+      amount: sumByUser.get(u.id) || 0,
+      count: countByUser.get(u.id) || 0
+    }))
     .filter(u => !q || String(u.name || '').toLowerCase().includes(q))
     .filter(u => u.amount > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -40,8 +46,12 @@ async function computeOpenBalances(searchTerm = '') {
 async function renderOpenBalances() {
   const search = $('#pb-search')?.value || '';
   let list = [];
-  try { list = await computeOpenBalances(search); }
-  catch (err) { console.error(err); return toast('❌ Kan openstaande saldi niet berekenen'); }
+  try {
+    list = await computeOpenBalances(search);
+  } catch (err) {
+    console.error(err);
+    return toast('❌ Kan openstaande saldi niet berekenen');
+  }
 
   const controls = document.querySelector('.saldi-controls');
   const existingBtn = document.getElementById('pb-set-global-link');
@@ -52,7 +62,9 @@ async function renderOpenBalances() {
     btn.textContent = GLOBAL_PAYLINK ? ' Betaallink wijzigen' : ' Betaallink instellen';
     btn.addEventListener('click', () => pbSetGlobalPayLink());
     controls.appendChild(btn);
-  } else if (!ADMIN_MODE && existingBtn) existingBtn.remove();
+  } else if (!ADMIN_MODE && existingBtn) {
+    existingBtn.remove();
+  }
 
   const rowsHtml = list.map(u => {
     const uid = esc(u.id);
@@ -60,40 +72,32 @@ async function renderOpenBalances() {
     const amountNum = Number(u.amount) || 0;
     const amount = euro(amountNum);
     const count = String(u.count);
-
     const attemptISO = PAYMENT_FLAGS.get(u.id) || null;
-    const attemptText = attemptISO
-      ? new Date(attemptISO).toLocaleString('nl-NL', {
-          day:'2-digit', month:'2-digit', year:'numeric',
-          hour:'2-digit', minute:'2-digit'
-        })
-      : null;
+    const attemptText = attemptISO ? new Date(attemptISO).toLocaleString('nl-NL', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    }) : null;
+    const attemptCell = attemptISO ? ` ${attemptText}${ADMIN_MODE ? ' ️' : ''}` : '—';
 
-    const attemptCell = attemptISO
-      ? `🕓 <small title="Gemeld op: ${attemptText}">${attemptText}</small>${
-          ADMIN_MODE
-            ? ' <button class="btn btn-tiny" onclick="pbClearFlag(\'' + uid + '\')">🗑️</button>'
-            : ''
-        }`
-      : '—';
+    let actions = ` Betalen ${ADMIN_MODE ? `✅ Betaald` : ''} `;
+    if (ADMIN_MODE && GLOBAL_PAYLINK) {
+      // Voeg WhatsApp-knop toe om betaalverzoek te sturen
+      const waText = encodeURIComponent(`Beste ${u.name},\nJe openstaande saldo is €${amountNum.toFixed(2)}. Betaallink: ${GLOBAL_PAYLINK}`);
+      const waLink = `https://wa.me/?text=${waText}`;
+      actions += ` <a href="${waLink}" target="_blank" rel="noopener noreferrer"><button class="btn">Whatsapp betalingsverzoek</button></a>`;
+    }
 
-    const actions = `
-      <button class="btn btn-small" onclick="pbPayto(this,'${uid}','${name}', ${amountNum.toFixed(2)})">Betalen</button>
-      ${ADMIN_MODE ? `<button class="btn btn-small" onclick="pbMarkPaid('${uid}')">✅ Betaald</button>` : ''}
-    `;
-
-    return `
-      <tr>
-        <td>${name}</td>
-        <td>${count}</td>
-        <td>${amount}</td>
-        <td>${attemptCell}</td>
-        <td>${actions}</td>
-      </tr>`;
+    return ` <tr>
+      <td>${name}</td>
+      <td>${count}</td>
+      <td>${amount}</td>
+      <td>${attemptCell}</td>
+      <td>${actions}</td>
+    </tr> `;
   }).join('');
 
-  if ($('#pb-rows'))
-    $('#pb-rows').innerHTML = rowsHtml || '<tr><td colspan="5">Geen resultaten</td></tr>';
+  if ($('#pb-rows')) {
+    $('#pb-rows').innerHTML = rowsHtml || 'Geen resultaten';
+  }
 }
 
 /* ---------- Admin-modus ---------- */
@@ -102,7 +106,9 @@ function toggleAdminMode() {
     const pin = prompt('Voer admin-PIN in:');
     if (pin !== '2420') return toast('❌ Onjuiste PIN');
     ADMIN_MODE = true;
-  } else ADMIN_MODE = false;
+  } else {
+    ADMIN_MODE = false;
+  }
   renderOpenBalances();
 }
 
@@ -115,10 +121,14 @@ window.pbMarkPaid = async (userId) => {
 
   const { error: pErr } = await supabase.from('payments').insert([{ user_id: userId, amount }]);
   if (pErr) return toast('❌ Betaling registreren mislukt');
+
   const { error: dErr } = await supabase.from('drinks').delete().eq('user_id', userId);
   if (dErr) return toast('⚠️ Betaling opgeslagen, maar drankjes niet gewist');
 
-  try { await supabase.from('payment_flags').delete().eq('user_id', userId); } catch {}
+  try {
+    await supabase.from('payment_flags').delete().eq('user_id', userId);
+  } catch {}
+
   toast(`✅ Betaald: ${euro(amount)}`);
   await loadPaymentFlags();
   await renderOpenBalances();
@@ -129,7 +139,9 @@ async function loadGlobalPayLink() {
   try {
     const { data } = await supabase.from('view_payment_link_latest').select('link,timestamp').maybeSingle();
     GLOBAL_PAYLINK = data?.link || null;
-  } catch { GLOBAL_PAYLINK = null; }
+  } catch {
+    GLOBAL_PAYLINK = null;
+  }
 }
 
 window.pbSetGlobalPayLink = async () => {
@@ -148,7 +160,9 @@ window.pbSetGlobalPayLink = async () => {
       GLOBAL_PAYLINK = clean;
       toast(' Betaallink opgeslagen');
     }
-  } catch { toast('❌ Betaallink instellen mislukt'); }
+  } catch {
+    toast('❌ Betaallink instellen mislukt');
+  }
   const btn = document.getElementById('pb-set-global-link');
   if (btn) btn.textContent = GLOBAL_PAYLINK ? ' Betaallink wijzigen' : ' Betaallink instellen';
 };
@@ -163,7 +177,9 @@ window.pbPayto = async (btn, userId, name, amount) => {
     await renderOpenBalances();
     window.open(GLOBAL_PAYLINK, '_blank', 'noopener,noreferrer');
   } finally {
-    setTimeout(() => { try { btn.disabled = false; btn.classList.remove('is-busy'); } catch {} }, 600);
+    setTimeout(() => {
+      try { btn.disabled = false; btn.classList.remove('is-busy'); } catch {}
+    }, 600);
   }
 };
 
@@ -171,8 +187,7 @@ window.pbPayto = async (btn, userId, name, amount) => {
 async function flagPaymentAttempt(userId) {
   try {
     const ts = new Date().toISOString();
-    await supabase.from('payment_flags')
-      .upsert({ user_id: userId, attempted_at: ts }, { onConflict: 'user_id' });
+    await supabase.from('payment_flags').upsert({ user_id: userId, attempted_at: ts }, { onConflict: 'user_id' });
     PAYMENT_FLAGS.set(userId, ts);
   } catch (e) {
     console.warn('[payment_flags] upsert mislukt:', e?.message || e);
@@ -186,17 +201,18 @@ async function loadPaymentFlags() {
     const { data } = await supabase.from('payment_flags').select('user_id, attempted_at');
     for (const r of (data || [])) PAYMENT_FLAGS.set(r.user_id, r.attempted_at);
   } catch (e) {
-    console.warn('[payment_flags] select error:', e?.message || e);
+    console.warn('[payment_flags] select error:', e);
+    toast('⚠️');
   }
 }
 
-/* ---------- 🗑️ vlag wissen (admin) ---------- */
+/* ---------- ️ vlag wissen (admin) ---------- */
 window.pbClearFlag = async (userId) => {
   if (!ADMIN_MODE) return toast('❌ Alleen in admin-modus');
   try {
     const { error } = await supabase.from('payment_flags').delete().eq('user_id', userId);
     if (error) throw error;
-    toast('🗑️ Meldvlag verwijderd');
+    toast('️ Meldvlag verwijderd');
     await loadPaymentFlags();
     await renderOpenBalances();
   } catch (e) {
