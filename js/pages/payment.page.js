@@ -45,6 +45,7 @@ async function renderOpenBalances() {
 
   const controls = document.querySelector('.saldi-controls');
   const existingBtn = document.getElementById('pb-set-global-link');
+
   if (ADMIN_MODE && controls && !existingBtn) {
     const btn = document.createElement('button');
     btn.className = 'btn';
@@ -87,10 +88,19 @@ async function renderOpenBalances() {
       actions += `<button class="btn btn-small" onclick="pbMarkPaid('${uid}')">✅ Betaald</button>`;
 
       if (GLOBAL_PAYLINK) {
-        const waText = encodeURIComponent(
-          `Beste ${u.name}, je openstaande saldo is €${amountNum.toFixed(2)}.\nBetaallink: ${GLOBAL_PAYLINK}`
-        );
+        const waMessage = `
+Hola!!! 👋🔥
+Het is heus het is waar, het moment is daar. 🎉
+Bij deze het betaalverzoek voor de drankjes uit de WI-koelkast, bij 40-45. 🍻
+
+${GLOBAL_PAYLINK}
+
+Alvast bedankt!! 🙏
+Nick Jonker`;
+
+        const waText = encodeURIComponent(waMessage);
         const waLink = `https://wa.me/?text=${waText}`;
+
         actions += `<button class="btn btn-small" onclick="window.open('${waLink}','_blank','noopener,noreferrer')">Whatsapp</button>`;
       }
     }
