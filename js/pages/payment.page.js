@@ -77,12 +77,24 @@ async function renderOpenBalances() {
     }) : null;
     const attemptCell = attemptISO ? ` ${attemptText}${ADMIN_MODE ? ' ️' : ''}` : '—';
 
-    // ---- HIER: alleen de WhatsApp-betaalverzoek knop ----
+    // ---- ACTIES ----
     let actions = '';
-    if (GLOBAL_PAYLINK) {
-      const waText = encodeURIComponent(`Beste ${u.name}, je openstaande saldo is €${amountNum.toFixed(2)}. Betaallink: ${GLOBAL_PAYLINK}`);
+
+    // Altijd zichtbaar: Betalen
+    actions += `<button class="btn" onclick="pbPayto(this, '${u.id}', '${u.name}', ${amountNum})">Betalen</button> `;
+
+    // Admin: Betaald
+    if (ADMIN_MODE) {
+      actions += `<button class="btn" onclick="pbMarkPaid('${u.id}')">✅ Betaald</button> `;
+    }
+
+    // Admin: WhatsApp
+    if (ADMIN_MODE && GLOBAL_PAYLINK) {
+      const waText = encodeURIComponent(
+        `Beste ${u.name}, je openstaande saldo is €${amountNum.toFixed(2)}.\nBetaallink: ${GLOBAL_PAYLINK}`
+      );
       const waLink = `https://wa.me/?text=${waText}`;
-      actions = `<button class="btn" onclick="window.open('${waLink}','_blank','noopener,noreferrer')">WhatsApp betaalverzoek</button>`;
+      actions += `<button class="btn" onclick="window.open('${waLink}', '_blank', 'noopener,noreferrer')">WhatsApp</button>`;
     }
 
     return ` <tr>
