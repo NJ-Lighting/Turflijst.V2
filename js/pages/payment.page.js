@@ -67,7 +67,6 @@ async function renderOpenBalances() {
   }
 
   const rowsHtml = list.map(u => {
-    const uid = esc(u.id);
     const name = esc(u.name);
     const amountNum = Number(u.amount) || 0;
     const amount = euro(amountNum);
@@ -78,12 +77,12 @@ async function renderOpenBalances() {
     }) : null;
     const attemptCell = attemptISO ? ` ${attemptText}${ADMIN_MODE ? ' ️' : ''}` : '—';
 
-    let actions = ` Betalen ${ADMIN_MODE ? `✅ Betaald` : ''} `;
-    if (ADMIN_MODE && GLOBAL_PAYLINK) {
-      // Voeg WhatsApp-knop toe om betaalverzoek te sturen
-      const waText = encodeURIComponent(`Beste ${u.name},\nJe openstaande saldo is €${amountNum.toFixed(2)}. Betaallink: ${GLOBAL_PAYLINK}`);
+    // ---- HIER: alleen de WhatsApp-betaalverzoek knop ----
+    let actions = '';
+    if (GLOBAL_PAYLINK) {
+      const waText = encodeURIComponent(`Beste ${u.name}, je openstaande saldo is €${amountNum.toFixed(2)}. Betaallink: ${GLOBAL_PAYLINK}`);
       const waLink = `https://wa.me/?text=${waText}`;
-      actions += ` <a href="${waLink}" target="_blank" rel="noopener noreferrer"><button class="btn">Whatsapp betalingsverzoek</button></a>`;
+      actions = `<button class="btn" onclick="window.open('${waLink}','_blank','noopener,noreferrer')">WhatsApp betaalverzoek</button>`;
     }
 
     return ` <tr>
@@ -206,7 +205,7 @@ async function loadPaymentFlags() {
   }
 }
 
-/* ---------- ️ vlag wissen (admin) ---------- */
+/* ---------- Flag wissen ---------- */
 window.pbClearFlag = async (userId) => {
   if (!ADMIN_MODE) return toast('❌ Alleen in admin-modus');
   try {
