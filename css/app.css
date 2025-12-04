@@ -15,8 +15,7 @@
   box-sizing: border-box;
 }
 
-html,
-body {
+html, body {
   height: 100%;
 }
 
@@ -28,13 +27,11 @@ body {
   padding: 20px;
 }
 
-/* === Achtergrond === */
 .bg-train {
   background: url('/Train%20scene.webp') no-repeat center center fixed;
   background-size: cover;
 }
 
-/* === Layout container === */
 .content-wrapper {
   background: var(--panel);
   padding: 20px;
@@ -56,39 +53,28 @@ body {
   color: #fff;
   transition: transform .2s, background .2s;
 }
-
 .btn:hover {
   background: var(--green-d);
   transform: scale(1.07);
 }
-
 .btn.block {
   display: block;
   width: min(90%, 250px);
   margin-inline: auto;
 }
-
 .btn.btn-warn {
   background: var(--danger);
 }
-
 .btn.btn-warn:hover {
   background: var(--danger-d);
 }
-
 .btn.ghost {
   background: #f0f0f0;
   color: #111;
 }
 
 /* === Inputs & Selects === */
-.select,
-select,
-input[type="number"],
-input[type="text"],
-input[type="url"],
-input[type="tel"],
-input[type="date"] {
+.select, select, input[type="number"], input[type="text"], input[type="url"], input[type="tel"], input[type="date"] {
   font-size: 18px;
   padding: 12px;
   width: 90%;
@@ -111,21 +97,16 @@ input[type="date"] {
   overflow: hidden;
   border: 2px solid var(--border);
 }
-
-.table th,
-.table td {
+.table th, .table td {
   border: 2px solid var(--border);
   padding: 10px;
   text-align: center;
 }
-
 .table th {
   background: var(--green);
   color: #fff;
 }
-
-.table td.right,
-.table th.right {
+.table td.right, .table th.right {
   text-align: right;
 }
 
@@ -138,7 +119,6 @@ input[type="date"] {
   max-width: 600px;
   margin-inline: auto;
 }
-
 .product-grid > div {
   display: flex;
   justify-content: center;
@@ -160,12 +140,10 @@ input[type="date"] {
   max-width: 250px;
   text-align: left;
 }
-
 .drink-btn:hover {
   background: var(--green-d);
   transform: scale(1.07);
 }
-
 .drink-btn img {
   height: 40px;
   width: 40px;
@@ -201,35 +179,69 @@ input[type="date"] {
 }
 
 /* === Compact Tables (Finance, etc.) === */
-.table.compact th,
-.table.compact td {
+.table.compact th, .table.compact td {
   padding: 5px 6px;
   line-height: 1.1;
   font-size: 0.85rem;
   border: 1px solid rgba(0, 0, 0, 0.15);
 }
-
 .table.compact th {
   background: var(--green);
   font-weight: bold;
 }
-
 .table.compact tr {
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
-
-.table.compact td.right,
-.table.compact th.right {
+.table.compact td.right, .table.compact th.right {
   text-align: right;
 }
 
-/* === Info bar (betaallink status) === */
-.link-info-bar {
-  background: rgba(255,255,255,0.1);
-  color: #ddd;
-  font-size: 0.9em;
-  padding: 6px 10px;
-  border-radius: 8px;
-  margin-bottom: 10px;
+/* ========== Quantity-teller & Undo knop styling ========== */
+.quantity-controls {
+  margin: 20px auto;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+.quantity-controls .quantity-label {
+  font-size: 18px;
+  color: var(--text);
+  margin-right: 8px;
+}
+.quantity-controls .quantity-input {
+  display: flex;
+  align-items: center;
+}
+.quantity-controls .quantity-input button {
+  font-size: 20px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  margin: 0 5px;
+}
+.quantity-controls .quantity-input span {
+  display: inline-block;
+  min-width: 30px;
   text-align: center;
+  font-size: 18px;
+  color: var(--text);
+}
+
+/* Groepering: teller en undo-knop onder elkaar, gecentreerd */
+.controls-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20px;
+}
+
+/* ========== Animatie bij bulk-logging ========== */
+.drink-btn.bulk-logging {
+  animation: pop 0.3s ease-in-out;
+}
+@keyframes pop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }

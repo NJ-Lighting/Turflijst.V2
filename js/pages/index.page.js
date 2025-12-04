@@ -2,9 +2,13 @@ import { $, toast, euro, esc } from '../core.js';
 import { supabase } from '../supabase.client.js';
 import { fetchUserDrinkPivot, fetchUserTotalsCurrentPrice } from '../api/metrics.js';
 
+/* ============================================================
+   INIT
+============================================================ */
 document.addEventListener('DOMContentLoaded', async () => {
   await loadUsers();
   await loadProducts();
+
   initQuantityControls();
   updateQuantityDisplay();
 
@@ -17,175 +21,168 @@ document.addEventListener('DOMContentLoaded', async () => {
   await renderPivotFromMetrics();
 });
 
-// Anti-spam flags + throttle
+/* ============================================================
+   GLOBAL STATE
+============================================================ */
 let isLogging = false;
 let isUndoing = false;
 let lastLogAt = 0;
 let lastUndoAt = 0;
-const THROTTLE_MS = 600;
-// Max 1 undo per laatst gelogde actie
+const THROTTLE_MS = 500;
+
 let canUndo = false;
 
-// Centrale hoeveelheid-teller (onder de drankjes, boven undo)
 let currentQuantity = 1;
 const MIN_QTY = 1;
-const MAX_QTY = 10; // eventueel aanpassen
+const MAX_QTY = 20;
 
+/* ============================================================
+   HELPERS
+============================================================ */
 function setUiBusy(busy) {
-  document
-    .querySelectorAll('#product-buttons button.btn')
-    .forEach((b) => (b.disabled = busy));
+  document.querySelectorAll('#product-buttons button.btn')
+    .forEach(b => (b.disabled = busy));
 
-  const undoBtn = document.getElementById('undo-btn');
+  const undoBtn = $('#undo-btn');
   if (undoBtn) undoBtn.disabled = busy;
 
-  const grid = document.getElementById('product-buttons');
+  const grid = $('#product-buttons');
   if (grid) {
     grid.style.pointerEvents = busy ? 'none' : '';
     grid.setAttribute('aria-busy', busy ? 'true' : 'false');
   }
 }
 
+function generateActionGroupId() {
+  if (crypto?.randomUUID) return crypto.randomUUID();
+  return `ag-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 function updateQuantityDisplay() {
-  const el = document.getElementById('quantity-display');
+  const el = $('#quantity-display');
   if (el) el.textContent = String(currentQuantity);
 }
 
-function generateActionGroupId() {
-  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-    return window.crypto.randomUUID();
-  }
-  return (
-    'ag-' +
-    Date.now().toString(36) +
-    '-' +
-    Math.random().toString(36).slice(2, 8)
-  );
-}
-
+/* ============================================================
+   QUANTITY CONTROLS
+============================================================ */
 function initQuantityControls() {
-  const undoBtn = document.getElementById('undo-btn');
+  const undoBtn = $('#undo-btn');
   if (!undoBtn) return;
-  if (document.getElementById('quantity-controls')) return;
+  if ($('#quantity-controls')) return;
 
-  const container = document.createElement('div');
-  container.id = 'quantity-controls';
-  container.className = 'quantity-controls';
-  container.innerHTML = `
+  const div = document.createElement('div');
+  div.id = 'quantity-controls';
+  div.className = 'quantity-controls';
+  div.innerHTML = `
     <div class="quantity-label">Aantal:</div>
     <div class="quantity-input">
-      <button type="button" class="btn quantity-minus" aria-label="Minder drankjes">-</button>
+      <button type="button" class="btn quantity-minus">-</button>
       <span id="quantity-display" aria-live="polite">1</span>
-      <button type="button" class="btn quantity-plus" aria-label="Meer drankjes">+</button>
+      <button type="button" class="btn quantity-plus">+</button>
     </div>
   `;
 
-  // Plaats de teller boven de undo-knop
-  undoBtn.parentNode.insertBefore(container, undoBtn);
+  undoBtn.parentNode.insertBefore(div, undoBtn);
 
-  const minus = container.querySelector('.quantity-minus');
-  const plus = container.querySelector('.quantity-plus');
+  div.querySelector('.quantity-minus')?.addEventListener('click', () => {
+    if (currentQuantity > MIN_QTY) {
+      currentQuantity--;
+      updateQuantityDisplay();
+    }
+  });
 
-  if (minus) {
-    minus.addEventListener('click', () => {
-      if (currentQuantity > MIN_QTY) {
-        currentQuantity -= 1;
-        updateQuantityDisplay();
-      }
-    });
-  }
-
-  if (plus) {
-    plus.addEventListener('click', () => {
-      if (currentQuantity < MAX_QTY) {
-        currentQuantity += 1;
-        updateQuantityDisplay();
-      }
-    });
-  }
+  div.querySelector('.quantity-plus')?.addEventListener('click', () => {
+    if (currentQuantity < MAX_QTY) {
+      currentQuantity++;
+      updateQuantityDisplay();
+    }
+  });
 }
 
+/* ============================================================
+   USERS DROPDOWN
+============================================================ */
 async function loadUsers() {
   const { data: users, error } = await supabase
     .from('users')
-    .select('id, name, "WIcreations"');
+    .select('id, name, WIcreations');
 
-  if (error) return console.error(error);
+  if (error) {
+    console.error("User load error:", error);
+    return;
+  }
 
   const sel = $('#user');
   if (!sel) return;
 
-  const coll = new Intl.Collator('nl', { sensitivity: 'base' });
-  const sorted = (users || []).slice().sort((a, b) => {
+  sel.innerHTML = `<option value="">-- Kies gebruiker --</option>`;
+
+  if (!users || users.length === 0) {
+    console.warn("Geen gebruikers gevonden");
+    return;
+  }
+
+  const sorted = [...users].sort((a, b) => {
     if (!!a.WIcreations !== !!b.WIcreations) return a.WIcreations ? -1 : 1;
-    return coll.compare(a.name, b.name);
+    return (a.name ?? "").localeCompare(b.name ?? "", "nl", { sensitivity: "base" });
   });
 
-  // Echte -regels met value="id"
-  const parts = ['-- Kies gebruiker --'];
-  let seenSplit = false;
-  sorted.forEach((u) => {
-    if (!u.WIcreations && !seenSplit) {
-      parts.push('────────────');
-      seenSplit = true;
+  let split = false;
+
+  for (const u of sorted) {
+    if (!u.WIcreations && !split) {
+      sel.insertAdjacentHTML("beforeend", `<option disabled>────────────</option>`);
+      split = true;
     }
-    parts.push(`${esc(u.name)}`);
-  });
 
-  sel.innerHTML = parts.join('');
+    sel.insertAdjacentHTML(
+      "beforeend",
+      `<option value="${u.id}">${esc(u.name)}</option>`
+    );
+  }
 }
 
+/* ============================================================
+   LOAD PRODUCTS
+============================================================ */
 async function loadProducts() {
-  const [{ data: products, error }, { data: batches, error: stockErr }] =
-    await Promise.all([
-      supabase
-        .from('products')
-        .select('id, name, price, image_url')
-        .order('name', { ascending: true }),
-      supabase
-        .from('stock_batches')
-        .select('product_id, quantity')
-        .gt('quantity', 0),
-    ]);
-
-  if (error) return console.error(error);
-  if (stockErr) return console.error(stockErr);
+  const [{ data: products }, { data: batches }] = await Promise.all([
+    supabase.from('products').select('id, name, price, image_url').order('name'),
+    supabase.from('stock_batches').select('product_id, quantity').gt('quantity', 0)
+  ]);
 
   const stockMap = new Map();
-  (batches || []).forEach((b) => {
-    const q = Number(b.quantity) || 0;
-    stockMap.set(b.product_id, (stockMap.get(b.product_id) || 0) + q);
+  batches?.forEach(b => {
+    stockMap.set(b.product_id, (stockMap.get(b.product_id) || 0) + Number(b.quantity));
   });
 
   const grid = $('#product-buttons');
   if (!grid) return;
-  grid.classList.add('product-grid');
+
   grid.innerHTML = '';
+  grid.classList.add('product-grid');
 
-  const BUCKET_URL =
-    'https://stmpommlhkokcjkwivfc.supabase.co/storage/v1/object/public/product-images/';
+  const BUCKET =
+    "https://stmpommlhkokcjkwivfc.supabase.co/storage/v1/object/public/product-images/";
 
-  (products || [])
-    .filter((p) => (stockMap.get(p.id) || 0) > 0)
-    .forEach((p) => {
+  products
+    ?.filter(p => (stockMap.get(p.id) || 0) > 0)
+    .forEach(p => {
       const wrap = document.createElement('div');
       const btn = document.createElement('button');
       btn.className = 'btn drink-btn';
-      btn.type = 'button';
 
-      const imgTag = p.image_url
-        ? `<img src="${BUCKET_URL}${encodeURIComponent(
-            p.image_url
-          )}" alt="${esc(p.name)}" class="drink-img">`
+      const img = p.image_url
+        ? `<img src="${BUCKET}${encodeURIComponent(p.image_url)}" class="drink-img">`
         : '';
 
-      btn.innerHTML = `${imgTag} ${esc(p.name)} ${euro(p.price)} `;
+      btn.innerHTML = `${img} ${esc(p.name)} ${euro(p.price)}`;
 
       btn.addEventListener('click', async () => {
-        if (btn.disabled) return;
         btn.disabled = true;
         try {
-          await logDrink(p.id, p.price, currentQuantity); // verkoopprijs + hoeveelheid
+          await logDrink(p.id, p.price, currentQuantity);
         } finally {
           btn.disabled = false;
         }
@@ -196,317 +193,267 @@ async function loadProducts() {
     });
 }
 
-window.logDrink = async (productId, sellPrice, quantityOverride) => {
+/* ============================================================
+   LOG DRINK (BULK + FIFO)
+============================================================ */
+window.logDrink = async (productId, sellPrice, qty) => {
   const now = Date.now();
   if (isLogging || now - lastLogAt < THROTTLE_MS) return;
+
   lastLogAt = now;
   isLogging = true;
   setUiBusy(true);
 
-  let qty = Number(quantityOverride ?? currentQuantity ?? 1);
-  if (!Number.isFinite(qty) || qty < MIN_QTY) qty = MIN_QTY;
-  if (qty > MAX_QTY) qty = MAX_QTY;
+  qty = Math.max(MIN_QTY, Math.min(MAX_QTY, Number(qty) || 1));
 
   const userId = $('#user').value;
   if (!userId) {
+    toast('⚠️ Kies eerst een gebruiker');
     setUiBusy(false);
     isLogging = false;
-    return toast('⚠️ Kies eerst een gebruiker');
+    return;
   }
 
-  // 1) Alle batches met voorraad (FIFO)
-  const { data: batches, error: obErr } = await supabase
+  const { data: batches } = await supabase
     .from('stock_batches')
     .select('id, quantity, price_per_piece')
     .eq('product_id', productId)
     .gt('quantity', 0)
-    .order('created_at', { ascending: true });
+    .order('created_at');
 
-  if (obErr || !batches || !batches.length) {
+  if (!batches?.length) {
+    toast('❌ Geen voorraad voor dit product');
     setUiBusy(false);
     isLogging = false;
-    return toast('❌ Geen voorraad meer voor dit product');
+    return;
   }
 
-  let totalAvailable = 0;
-  for (const b of batches) {
-    totalAvailable += Number(b.quantity) || 0;
-  }
-
-  if (totalAvailable < qty) {
+  const total = batches.reduce((sum, b) => sum + Number(b.quantity), 0);
+  if (total < qty) {
+    toast('❌ Niet genoeg voorraad');
     setUiBusy(false);
     isLogging = false;
-    return toast('❌ Niet genoeg voorraad voor dit aantal');
+    return;
   }
 
-  // 2) Consumptieplan per batch (FIFO)
   let remaining = qty;
   const plan = [];
+
   for (const b of batches) {
-    const startQty = Number(b.quantity) || 0;
-    if (startQty <= 0) continue;
-    const use = Math.min(startQty, remaining);
+    const available = Number(b.quantity);
+    const use = Math.min(available, remaining);
     if (use > 0) {
       plan.push({
         batch_id: b.id,
         count: use,
-        price_per_piece: b.price_per_piece,
-        startQty,
+        startQty: available,
+        price_per_piece: b.price_per_piece
       });
       remaining -= use;
       if (remaining === 0) break;
     }
   }
 
-  const actionGroupId = generateActionGroupId();
-
+  const groupId = generateActionGroupId();
   const rows = [];
-  for (const entry of plan) {
+
+  plan.forEach(entry => {
     for (let i = 0; i < entry.count; i++) {
       rows.push({
         user_id: userId,
         product_id: productId,
         price_at_purchase: entry.price_per_piece,
-        sell_price_at_purchase: sellPrice ?? entry.price_per_piece,
+        sell_price_at_purchase: sellPrice,
         batch_id: entry.batch_id,
-        action_group_id: actionGroupId,
+        action_group_id: groupId
       });
     }
+  });
+
+  const { error: insertErr } = await supabase.from('drinks').insert(rows);
+  if (insertErr) {
+    toast('❌ Fout bij loggen');
+    setUiBusy(false);
+    isLogging = false;
+    return;
   }
 
-  // 3) Alle drankjes in één keer wegschrijven
-  {
-    const { error: dErr } = await supabase.from('drinks').insert(rows);
-    if (dErr) {
-      setUiBusy(false);
-      isLogging = false;
-      return toast('❌ Fout bij loggen drankje');
-    }
-  }
-
-  // 4) Alle geraakte batches bijwerken
-  for (const entry of plan) {
-    const newQty = (Number(entry.startQty) || 0) - entry.count;
-    const { error: uErr } = await supabase
+  for (const p of plan) {
+    await supabase
       .from('stock_batches')
-      .update({ quantity: newQty })
-      .eq('id', entry.batch_id);
-    if (uErr) {
-      setUiBusy(false);
-      isLogging = false;
-      return toast('❌ Fout bij afboeken voorraad');
-    }
+      .update({ quantity: p.startQty - p.count })
+      .eq('id', p.batch_id);
   }
 
   await loadProducts();
-
-  const sel = $('#user');
-  if (sel) sel.value = '';
-
-  // teller terug naar 1
   currentQuantity = 1;
   updateQuantityDisplay();
 
-  try {
-    toast(qty === 1 ? '✅ Drankje toegevoegd' : `✅ ${qty} drankjes toegevoegd`);
-    await renderTotalsFromMetrics();
-    await renderPivotFromMetrics();
-    canUndo = true;
-  } finally {
-    setUiBusy(false);
-    isLogging = false;
-  }
+  toast(qty === 1 ? '✅ Drankje toegevoegd' : `✅ ${qty} drankjes toegevoegd`);
+
+  await renderTotalsFromMetrics();
+  await renderPivotFromMetrics();
+
+  canUndo = true;
+  setUiBusy(false);
+  isLogging = false;
 };
 
-window.undoLastDrink = async (el) => {
-  if (!canUndo) {
-    toast('Niets om ongedaan te maken');
-    return;
+/* ============================================================
+   UNDO GROUP
+============================================================ */
+async function restoreBatch(row) {
+  if (row.batch_id) {
+    const { data: b } = await supabase
+      .from('stock_batches')
+      .select('id, quantity')
+      .eq('id', row.batch_id)
+      .maybeSingle();
+
+    if (b) {
+      await supabase
+        .from('stock_batches')
+        .update({ quantity: Number(b.quantity) + 1 })
+        .eq('id', b.id);
+      return;
+    }
   }
-  if (el && !el.disabled) el.disabled = true;
+
+  await supabase.from('stock_batches').insert([{
+    product_id: row.product_id,
+    quantity: 1,
+    price_per_piece: row.price_at_purchase
+  }]);
+}
+
+window.undoLastDrink = async () => {
+  if (!canUndo) return toast('Niets om ongedaan te maken');
 
   const now = Date.now();
-  if (isUndoing || now - lastUndoAt < THROTTLE_MS) {
-    if (el) el.disabled = false;
-    return;
-  }
+  if (isUndoing || now - lastUndoAt < THROTTLE_MS) return;
+
   lastUndoAt = now;
   isUndoing = true;
   setUiBusy(true);
 
-  // laatste drink incl. batch & prijs & action_group_id
-  const { data: last, error } = await supabase
+  const { data: last } = await supabase
     .from('drinks')
-    .select('id, user_id, product_id, batch_id, price_at_purchase, action_group_id')
+    .select('id, product_id, batch_id, price_at_purchase, action_group_id')
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
 
-  if (error || !last) {
-    toast('❌ Geen drankje om te verwijderen');
+  if (!last) {
+    toast('Geen gegevens');
     setUiBusy(false);
     isUndoing = false;
-    if (el) el.disabled = false;
     return;
   }
 
-  let groupRows = null;
+  let undone = 1;
 
   if (!last.action_group_id) {
-    // oude gedrag: 1 record
-    const { error: delErr } = await supabase
-      .from('drinks')
-      .delete()
-      .eq('id', last.id);
-    if (delErr) {
-      setUiBusy(false);
-      isUndoing = false;
-      if (el) el.disabled = false;
-      return toast('❌ Fout bij verwijderen drankje');
-    }
+    await supabase.from('drinks').delete().eq('id', last.id);
+    await restoreBatch(last);
 
-    if (last.batch_id) {
-      const { data: b, error: bErr } = await supabase
-        .from('stock_batches')
-        .select('id, quantity')
-        .eq('id', last.batch_id)
-        .maybeSingle();
-      if (!bErr && b) {
-        await supabase
-          .from('stock_batches')
-          .update({ quantity: (Number(b.quantity) || 0) + 1 })
-          .eq('id', b.id);
-      } else {
-        await supabase.from('stock_batches').insert([
-          {
-            product_id: last.product_id,
-            quantity: 1,
-            price_per_piece: last.price_at_purchase,
-          },
-        ]);
-      }
-    } else {
-      await supabase.from('stock_batches').insert([
-        {
-          product_id: last.product_id,
-          quantity: 1,
-          price_per_piece: last.price_at_purchase ?? 0,
-        },
-      ]);
-    }
   } else {
-    // nieuwe gedrag: hele actie (groep) ongedaan maken
-    const { data, error: groupErr } = await supabase
+    const { data: group } = await supabase
       .from('drinks')
       .select('id, product_id, batch_id, price_at_purchase')
       .eq('action_group_id', last.action_group_id);
 
-    groupRows = data;
+    undone = group.length;
 
-    if (groupErr || !groupRows || !groupRows.length) {
-      setUiBusy(false);
-      isUndoing = false;
-      if (el) el.disabled = false;
-      return toast('❌ Geen drankje om te verwijderen');
-    }
-
-    const { error: delErr } = await supabase
+    await supabase
       .from('drinks')
       .delete()
       .eq('action_group_id', last.action_group_id);
-    if (delErr) {
-      setUiBusy(false);
-      isUndoing = false;
-      if (el) el.disabled = false;
-      return toast('❌ Fout bij verwijderen drankjes');
-    }
 
-    for (const row of groupRows) {
-      if (row.batch_id) {
-        const { data: b, error: bErr } = await supabase
-          .from('stock_batches')
-          .select('id, quantity')
-          .eq('id', row.batch_id)
-          .maybeSingle();
-        if (!bErr && b) {
-          await supabase
-            .from('stock_batches')
-            .update({ quantity: (Number(b.quantity) || 0) + 1 })
-            .eq('id', b.id);
-        } else {
-          await supabase.from('stock_batches').insert([
-            {
-              product_id: row.product_id,
-              quantity: 1,
-              price_per_piece: row.price_at_purchase,
-            },
-          ]);
-        }
-      } else {
-        await supabase.from('stock_batches').insert([
-          {
-            product_id: row.product_id,
-            quantity: 1,
-            price_per_piece: row.price_at_purchase ?? 0,
-          },
-        ]);
-      }
+    for (const row of group) {
+      await restoreBatch(row);
     }
   }
 
   await loadProducts();
+  await renderTotalsFromMetrics();
+  await renderPivotFromMetrics();
 
-  const undoneCount =
-    last.action_group_id && Array.isArray(groupRows) && groupRows.length
-      ? groupRows.length
-      : 1;
+  toast(
+    undone === 1
+      ? '⏪ Laatste drankje verwijderd'
+      : `⏪ Laatste actie verwijderd (${undone} drankjes)`
+  );
 
-  try {
-    toast(
-      undoneCount === 1
-        ? '⏪ Laatste drankje verwijderd'
-        : `⏪ Laatste actie verwijderd (${undoneCount} drankjes)`
-    );
-    await renderTotalsFromMetrics();
-    await renderPivotFromMetrics();
-    canUndo = false;
-  } finally {
-    setUiBusy(false);
-    isUndoing = false;
-    if (el) el.disabled = false;
-  }
+  canUndo = false;
+  setUiBusy(false);
+  isUndoing = false;
 };
 
+/* ============================================================
+   TOTALS TABLE
+============================================================ */
 async function renderTotalsFromMetrics() {
   try {
-    $('#totalToPayList').innerHTML = `Laden…`;
     const rows = await fetchUserTotalsCurrentPrice(supabase);
-    $('#totalToPayList').innerHTML =
-      (rows || [])
-        .map((r) => `${esc(r.name)}${euro(r.amount)}`)
-        .join('') || `Nog geen data`;
+
+    if (!rows || rows.length === 0) {
+      $('#totalToPayList').innerHTML =
+        `<tr><td colspan="2">Nog geen data</td></tr>`;
+      return;
+    }
+
+    const body = rows.map(r => `
+      <tr>
+        <td>${esc(r.name)}</td>
+        <td style="text-align:right">${euro(r.amount)}</td>
+      </tr>
+    `).join('');
+
+    $('#totalToPayList').innerHTML = body;
+
   } catch (e) {
-    console.error('renderTotalsFromMetrics:', e);
-    $('#totalToPayList').innerHTML = `Kon bedragen niet laden`;
+    console.error("Totals error:", e);
+    $('#totalToPayList').innerHTML =
+      `<tr><td colspan="2">Kon niet laden</td></tr>`;
   }
 }
 
+/* ============================================================
+   PIVOT TABLE
+============================================================ */
 async function renderPivotFromMetrics() {
   try {
     const { products, rows } = await fetchUserDrinkPivot(supabase);
-    $('#userDrinkTotalsHead').innerHTML = `Gebruiker${products
-      .map((p) => `${esc(p)}`)
-      .join('')}`;
-    $('#userDrinkTotalsBody').innerHTML =
-      (rows || [])
-        .map(
-          (r) =>
-            `${esc(r.user)}${r.counts.map((c) => `${c}`).join('')}`
-        )
-        .join('') || `Nog geen data`;
+
+    const headHtml = `
+      <tr>
+        <th>Gebruiker</th>
+        ${products.map(p => `<th>${esc(p)}</th>`).join('')}
+      </tr>
+    `;
+    $('#userDrinkTotalsHead').innerHTML = headHtml;
+
+    if (!rows || rows.length === 0) {
+      $('#userDrinkTotalsBody').innerHTML =
+        `<tr><td colspan="${products.length + 1}">Nog geen data</td></tr>`;
+      return;
+    }
+
+    const bodyHtml = rows
+      .map(r => `
+        <tr>
+          <td>${esc(r.user)}</td>
+          ${r.counts.map(c => `<td>${c}</td>`).join('')}
+        </tr>
+      `)
+      .join('');
+
+    $('#userDrinkTotalsBody').innerHTML = bodyHtml;
+
   } catch (e) {
-    console.error('renderPivotFromMetrics:', e);
+    console.error("Pivot error:", e);
     $('#userDrinkTotalsHead').innerHTML = '';
-    $('#userDrinkTotalsBody').innerHTML = `Kon gegevens niet laden`;
+    $('#userDrinkTotalsBody').innerHTML =
+      `<tr><td colspan="99">Kon gegevens niet laden</td></tr>`;
   }
 }
