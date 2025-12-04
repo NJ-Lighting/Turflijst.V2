@@ -1,6 +1,7 @@
 // /js/pages/payment.page.js
 import { $, euro, esc, toast } from "../core.js";
 import { supabase } from "../supabase.client.js";
+import { openPaymentWindow } from "../payments/open-payment.js";
 
 let GLOBAL_PAYLINK = null;
 let PAYMENT_FLAGS = new Map();
@@ -31,24 +32,23 @@ async function computeOpenBalances(searchTerm = "") {
     .from("drinks")
     .select("user_id, price_at_purchase, products(price)");
 
-  const sumByUser = new Map();
-  const countByUser = new Map();
+  const sum = new Map();
+  const cnt = new Map();
 
   (rows || []).forEach((r) => {
     const price = Number(r?.price_at_purchase ?? r?.products?.price ?? 0);
-    const uid = r.user_id;
-    sumByUser.set(uid, (sumByUser.get(uid) || 0) + price);
-    countByUser.set(uid, (countByUser.get(uid) || 0) + 1);
+    sum.set(r.user_id, (sum.get(r.user_id) || 0) + price);
+    cnt.set(r.user_id, (cnt.get(r.user_id) || 0) + 1);
   });
 
-  const q = (searchTerm || "").trim().toLowerCase();
+  const q = searchTerm.trim().toLowerCase();
 
   return (users || [])
     .map((u) => ({
       id: u.id,
       name: u.name,
-      amount: sumByUser.get(u.id) || 0,
-      count: countByUser.get(u.id) || 0,
+      amount: sum.get(u.id) || 0,
+      count: cnt.get(u.id) || 0,
     }))
     .filter((u) => !q || u.name.toLowerCase().includes(q))
     .filter((u) => u.amount > 0)
@@ -60,58 +60,45 @@ async function computeOpenBalances(searchTerm = "") {
 --------------------------------------------------------- */
 async function renderOpenBalances() {
   const search = $("#pb-search")?.value || "";
-  let list = [];
+  const list = await computeOpenBalances(search);
 
-  try {
-    list = await computeOpenBalances(search);
-  } catch (err) {
-    console.error(err);
-    return toast("❌ Kan openstaande saldi niet berekenen");
-  }
-
-  const rowsHtml = list
+  const rows = list
     .map((u) => {
       const uid = esc(u.id);
       const name = esc(u.name);
-      const count = String(u.count);
-      const amount = euro(Number(u.amount) || 0);
+      const count = u.count;
+      const amount = euro(u.amount);
 
-      const attemptISO = PAYMENT_FLAGS.get(u.id) || null;
-      const attemptText = attemptISO
-        ? new Date(attemptISO).toLocaleString("nl-NL")
+      const flagISO = PAYMENT_FLAGS.get(u.id) || null;
+      const flagTxt = flagISO
+        ? new Date(flagISO).toLocaleString("nl-NL")
         : null;
 
-      // Poging + kruisje in admin-modus
-      const attemptCell = attemptISO
-        ? `${attemptText} ${
+      const attemptCell = flagISO
+        ? `${flagTxt} ${
             ADMIN_MODE
               ? `<button class="btn pb-admin-clear" data-id="${uid}">❌</button>`
               : ""
           }`
         : "—";
 
-      // Betalen-knop
       const btnPay = `
         <button class="btn pb-pay"
           data-id="${uid}"
-          data-name="${esc(u.name)}"
+          data-name="${name}"
           data-amount="${u.amount}">
           Betalen
         </button>
       `;
 
-      // Admin extra knoppen
-      let adminExtra = "";
+      let adminBtns = "";
       if (ADMIN_MODE) {
-        adminExtra += `
-          <button class="btn pb-admin-paid" data-id="${uid}">
-            Betaald
-          </button>
+        adminBtns += `
+          <button class="btn pb-admin-paid" data-id="${uid}">Betaald</button>
         `;
-
-        adminExtra += `
+        adminBtns += `
           <button class="btn pb-admin-wa"
-            data-name="${esc(u.name)}"
+            data-name="${name}"
             data-link="${GLOBAL_PAYLINK || ""}">
             Whatsapp
           </button>
@@ -124,13 +111,13 @@ async function renderOpenBalances() {
           <td>${count}</td>
           <td>${amount}</td>
           <td>${attemptCell}</td>
-          <td>${btnPay}${adminExtra}</td>
+          <td>${btnPay}${adminBtns}</td>
         </tr>
       `;
     })
     .join("");
 
-  $("#pb-rows").innerHTML = rowsHtml;
+  $("#pb-rows").innerHTML = rows;
 
   /* ---------------------------------------------------------
      EVENTS BINDEN
@@ -138,8 +125,14 @@ async function renderOpenBalances() {
 
   // Betalen
   document.querySelectorAll(".pb-pay").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      pbPayto(btn, btn.dataset.id, btn.dataset.name, btn.dataset.amount);
+    btn.addEventListener("click", async () => {
+      const userId = btn.dataset.id;
+
+      await flagPaymentAttempt(userId);
+      await loadPaymentFlags();
+      await renderOpenBalances();
+
+      openPaymentWindow(GLOBAL_PAYLINK);
     });
   });
 
@@ -148,7 +141,7 @@ async function renderOpenBalances() {
     btn.addEventListener("click", () => pbMarkPaid(btn.dataset.id));
   });
 
-  // Admin: Whatsapp
+  // Admin: WhatsApp
   document.querySelectorAll(".pb-admin-wa").forEach((btn) => {
     btn.addEventListener("click", () => {
       const msg = `Hola!!!
@@ -192,13 +185,13 @@ window.pbMarkPaid = async (userId) => {
   const entry = balances.find((b) => b.id == userId);
   const amount = entry?.amount || 0;
 
-  if (!(amount > 0)) return toast("Geen openstaand saldo");
+  if (amount <= 0) return toast("Geen openstaand saldo");
 
   await supabase.from("payments").insert([{ user_id: userId, amount }]);
   await supabase.from("drinks").delete().eq("user_id", userId);
   await supabase.from("payment_flags").delete().eq("user_id", userId);
 
-  toast(`✅ Betaald: ${amount}`);
+  toast(`✅ Betaald: ${euro(amount)}`);
 
   await loadPaymentFlags();
   renderOpenBalances();
@@ -220,27 +213,6 @@ async function loadGlobalPayLink() {
 }
 
 /* ---------------------------------------------------------
-   BETALEN (met iPhone-fix)
---------------------------------------------------------- */
-window.pbPayto = async (btn, userId, name, amount) => {
-  if (!GLOBAL_PAYLINK) return toast("⚠️ Geen open betaallink ingesteld");
-
-  let win = null;
-
-  // iPhone fix: popup moet direct op klik openen
-  try {
-    win = window.open("", "_blank", "noopener,noreferrer");
-  } catch {}
-
-  await flagPaymentAttempt(userId);
-  await loadPaymentFlags();
-  await renderOpenBalances();
-
-  if (win) win.location.href = GLOBAL_PAYLINK;
-  else window.location.href = GLOBAL_PAYLINK;
-};
-
-/* ---------------------------------------------------------
    FLAG FUNCTIES
 --------------------------------------------------------- */
 async function flagPaymentAttempt(userId) {
@@ -255,7 +227,6 @@ async function flagPaymentAttempt(userId) {
 
 async function loadPaymentFlags() {
   PAYMENT_FLAGS.clear();
-
   const { data } = await supabase
     .from("payment_flags")
     .select("user_id, attempted_at");
@@ -265,9 +236,7 @@ async function loadPaymentFlags() {
 
 window.pbClearFlag = async (userId) => {
   await supabase.from("payment_flags").delete().eq("user_id", userId);
-
   toast("❌ Flag verwijderd");
-
   await loadPaymentFlags();
   renderOpenBalances();
 };
