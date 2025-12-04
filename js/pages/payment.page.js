@@ -99,22 +99,40 @@ async function renderOpenBalances() {
         ? `${attemptText}${ADMIN_MODE ? ' ️' : ''}`
         : '—';
 
-      /* ---------- Acties ---------- */
-      const btnHtml = `<button class="btn" onclick="pbPayto(this, ${uid}, '${esc(
-        u.name
-      )}', ${u.amount})">Betalen</button>`;
+      /* ---------- Acties (geen inline onclick meer!) ---------- */
+      const btnHtml = `
+        <button class="btn pb-pay"
+          data-id="${uid}"
+          data-name="${esc(u.name)}"
+          data-amount="${u.amount}">
+          Betalen
+        </button>`;
 
-      return `<tr>
-        <td>${name}</td>
-        <td>${count}</td>
-        <td>${amount}</td>
-        <td>${attemptCell}</td>
-        <td>${btnHtml}</td>
-      </tr>`;
+      return `
+        <tr>
+          <td>${name}</td>
+          <td>${count}</td>
+          <td>${amount}</td>
+          <td>${attemptCell}</td>
+          <td>${btnHtml}</td>
+        </tr>
+      `;
     })
     .join('');
 
   if ($('#pb-rows')) $('#pb-rows').innerHTML = rowsHtml || '';
+
+  /* ---------- Nieuwe event binding voor alle Betalen knoppen ---------- */
+  document.querySelectorAll('.pb-pay').forEach(btn => {
+    btn.addEventListener('click', () => {
+      pbPayto(
+        btn,
+        btn.dataset.id,
+        btn.dataset.name,
+        btn.dataset.amount
+      );
+    });
+  });
 }
 
 /* ---------- Admin-modus ---------- */
@@ -128,7 +146,7 @@ function toggleAdminMode() {
   renderOpenBalances();
 }
 
-/* ---------- Betaald ---------- */
+/* ---------- Betaald (admin) ---------- */
 window.pbMarkPaid = async userId => {
   const balances = await computeOpenBalances('');
   const entry = balances.find(b => b.id === userId);
@@ -200,17 +218,17 @@ window.pbSetGlobalPayLink = async () => {
       : ' Betaallink instellen';
 };
 
-/* ---------- Betalen (iPhone-proof) ---------- */
+/* ---------- Betalen — iPhone/Android-proof ---------- */
 window.pbPayto = async (btn, userId, name, amount) => {
   if (!GLOBAL_PAYLINK) return toast('⚠️ Geen open betaallink ingesteld');
 
   let win = null;
 
-  // Safari / iPhone fix: open lege window direct bij klik
+  // iPhone: popup MOET direct tijdens click geopend worden
   try {
     win = window.open('', '_blank', 'noopener,noreferrer');
   } catch (e) {
-    console.warn('Kon lege window niet openen:', e);
+    console.warn('Kon lege tab niet openen:', e);
   }
 
   try {
@@ -218,11 +236,9 @@ window.pbPayto = async (btn, userId, name, amount) => {
     await loadPaymentFlags();
     await renderOpenBalances();
 
-    // Vul de URL zodra de async taken klaar zijn
     if (win) {
       win.location.href = GLOBAL_PAYLINK;
     } else {
-      // fallback: open in zelfde tab
       window.location.href = GLOBAL_PAYLINK;
     }
   } finally {
