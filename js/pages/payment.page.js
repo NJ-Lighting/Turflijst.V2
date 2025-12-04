@@ -96,30 +96,25 @@ async function renderOpenBalances() {
         : null;
 
       const attemptCell = attemptISO
-        ? ` ${attemptText}${ADMIN_MODE ? ' ️' : ''}`
+        ? `${attemptText}${ADMIN_MODE ? ' ️' : ''}`
         : '—';
 
       /* ---------- Acties ---------- */
-      let actions = ` <button class="btn" onclick="pbPayto(this, ${uid}, '${esc(
+      const btnHtml = `<button class="btn" onclick="pbPayto(this, ${uid}, '${esc(
         u.name
-      )}', ${u.amount})">Betalen</button> `;
+      )}', ${u.amount})">Betalen</button>`;
 
-      if (ADMIN_MODE) {
-        actions += `✅ Betaald`;
-
-        if (GLOBAL_PAYLINK) {
-          const waMessage = ` Hola!!! Het is heus het is waar, het moment is daar.\nL1: ${GLOBAL_PAYLINK} Alvast bedankt!! Nick Jonker`;
-          const waText = encodeURIComponent(waMessage);
-          const waLink = `https://wa.me/?text=${waText}`;
-          actions += ` <a href="${waLink}" target="_blank">Whatsapp</a>`;
-        }
-      }
-
-      return `<div class="saldo-row">${name} — ${count} — ${amount} — ${attemptCell} — ${actions}</div>\n`;
+      return `<tr>
+        <td>${name}</td>
+        <td>${count}</td>
+        <td>${amount}</td>
+        <td>${attemptCell}</td>
+        <td>${btnHtml}</td>
+      </tr>`;
     })
     .join('');
 
-  if ($('#pb-rows')) $('#pb-rows').innerHTML = rowsHtml || 'Geen resultaten';
+  if ($('#pb-rows')) $('#pb-rows').innerHTML = rowsHtml || '';
 }
 
 /* ---------- Admin-modus ---------- */
