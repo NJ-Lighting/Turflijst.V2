@@ -29,8 +29,14 @@ async function computeOpenBalances(searchTerm = '') {
   });
 
   const q = (searchTerm || '').trim().toLowerCase();
+
   return (users || [])
-    .map(u => ({ id: u.id, name: u.name, amount: sumByUser.get(u.id) || 0, count: countByUser.get(u.id) || 0 }))
+    .map(u => ({
+      id: u.id,
+      name: u.name,
+      amount: sumByUser.get(u.id) || 0,
+      count: countByUser.get(u.id) || 0,
+    }))
     .filter(u => !q || String(u.name || '').toLowerCase().includes(q))
     .filter(u => u.amount > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -40,12 +46,15 @@ async function computeOpenBalances(searchTerm = '') {
 async function renderOpenBalances() {
   const search = $('#pb-search')?.value || '';
   let list = [];
-  try { list = await computeOpenBalances(search); }
-  catch (err) { console.error(err); return toast('❌ Kan openstaande saldi niet berekenen'); }
+  try {
+    list = await computeOpenBalances(search);
+  } catch (err) {
+    console.error(err);
+    return toast('❌ Kan openstaande saldi niet berekenen');
+  }
 
   const controls = document.querySelector('.saldi-controls');
   const existingBtn = document.getElementById('pb-set-global-link');
-
   if (ADMIN_MODE && controls && !existingBtn) {
     const btn = document.createElement('button');
     btn.className = 'btn';
@@ -63,60 +72,25 @@ async function renderOpenBalances() {
     const count = String(u.count);
 
     const attemptISO = PAYMENT_FLAGS.get(u.id) || null;
-    const attemptText = attemptISO
-      ? new Date(attemptISO).toLocaleString('nl-NL', {
-          day:'2-digit', month:'2-digit', year:'numeric',
-          hour:'2-digit', minute:'2-digit'
-        })
-      : null;
-
-    const attemptCell = attemptISO
-      ? `🕓 <small title="Gemeld op: ${attemptText}">${attemptText}</small>${
-          ADMIN_MODE
-            ? ' <button class="btn btn-tiny" onclick="pbClearFlag(\'' + uid + '\')">🗑️</button>'
-            : ''
-        }`
-      : '—';
+    const attemptText = attemptISO ? new Date(attemptISO).toLocaleString('nl-NL', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : null;
+    const attemptCell = attemptISO ? ` ${attemptText}${ ADMIN_MODE ? ' ️' : '' }` : '—';
 
     /* -------------------- ACTIES -------------------- */
-
-    let actions = `
-      <button class="btn btn-small" onclick="pbPayto(this,'${uid}','${name}', ${amountNum.toFixed(2)})">Betalen</button>
-    `;
-
+    let actions = ` <button class="btn" onclick="pbPayto(this, ${uid}, '${esc(u.name)}', ${u.amount})">Betalen</button> `;
     if (ADMIN_MODE) {
-      actions += `<button class="btn btn-small" onclick="pbMarkPaid('${uid}')">✅ Betaald</button>`;
-
+      actions += `✅ Betaald`;
       if (GLOBAL_PAYLINK) {
-        const waMessage = `
-Hola!!! 👋🔥
-Het is heus het is waar, het moment is daar. 🎉
-Bij deze het betaalverzoek voor de drankjes uit de WI-koelkast, bij 40-45. 🍻
-
-${GLOBAL_PAYLINK}
-
-Alvast bedankt!! 🙏
-Nick Jonker`;
-
+        const waMessage = ` Hola!!! Het is heus het is waar, het moment is daar.\nL1: ${GLOBAL_PAYLINK} Alvast bedankt!! Nick Jonker`;
         const waText = encodeURIComponent(waMessage);
         const waLink = `https://wa.me/?text=${waText}`;
-
-        actions += `<button class="btn btn-small" onclick="window.open('${waLink}','_blank','noopener,noreferrer')">Whatsapp</button>`;
+        actions += ` <a href="${waLink}" target="_blank">Whatsapp</a>`;
       }
     }
 
-    return `
-      <tr>
-        <td>${name}</td>
-        <td>${count}</td>
-        <td>${amount}</td>
-        <td>${attemptCell}</td>
-        <td>${actions}</td>
-      </tr>`;
+    return `<div class="saldo-row">${name} — ${count} — ${amount} — ${attemptCell} — ${actions}</div>`;
   }).join('');
 
-  if ($('#pb-rows'))
-    $('#pb-rows').innerHTML = rowsHtml || '<tr><td colspan="5">Geen resultaten</td></tr>';
+  if ($('#pb-rows')) $('#pb-rows').innerHTML = rowsHtml || 'Geen resultaten';
 }
 
 /* ---------- Admin-modus ---------- */
@@ -138,6 +112,7 @@ window.pbMarkPaid = async (userId) => {
 
   const { error: pErr } = await supabase.from('payments').insert([{ user_id: userId, amount }]);
   if (pErr) return toast('❌ Betaling registreren mislukt');
+
   const { error: dErr } = await supabase.from('drinks').delete().eq('user_id', userId);
   if (dErr) return toast('⚠️ Betaling opgeslagen, maar drankjes niet gewist');
 
@@ -152,13 +127,16 @@ async function loadGlobalPayLink() {
   try {
     const { data } = await supabase.from('view_payment_link_latest').select('link,timestamp').maybeSingle();
     GLOBAL_PAYLINK = data?.link || null;
-  } catch { GLOBAL_PAYLINK = null; }
+  } catch {
+    GLOBAL_PAYLINK = null;
+  }
 }
 
 window.pbSetGlobalPayLink = async () => {
   const current = GLOBAL_PAYLINK || '';
   const url = prompt('Voer de OPEN betaallink in (leeg = verwijderen):', current);
   if (url === null) return;
+
   try {
     if ((url || '').trim() === '') {
       await supabase.from('payment_links').delete().neq('id', null);
@@ -171,7 +149,10 @@ window.pbSetGlobalPayLink = async () => {
       GLOBAL_PAYLINK = clean;
       toast(' Betaallink opgeslagen');
     }
-  } catch { toast('❌ Betaallink instellen mislukt'); }
+  } catch {
+    toast('❌ Betaallink instellen mislukt');
+  }
+
   const btn = document.getElementById('pb-set-global-link');
   if (btn) btn.textContent = GLOBAL_PAYLINK ? ' Betaallink wijzigen' : ' Betaallink instellen';
 };
@@ -179,14 +160,31 @@ window.pbSetGlobalPayLink = async () => {
 /* ---------- Betalen ---------- */
 window.pbPayto = async (btn, userId, name, amount) => {
   if (!GLOBAL_PAYLINK) return toast('⚠️ Geen open betaallink ingesteld');
-  try { btn.disabled = true; btn.classList.add('is-busy'); } catch {}
+  let win;
+  try {
+    // open lege window direct bij click — voorkomt dat Safari blokkeert
+    win = window.open('', '_blank', 'noopener,noreferrer');
+  } catch (e) {
+    console.warn('Openen lege window mislukt:', e);
+    win = null;
+  }
+
   try {
     await flagPaymentAttempt(userId);
     await loadPaymentFlags();
     await renderOpenBalances();
-    window.open(GLOBAL_PAYLINK, '_blank', 'noopener,noreferrer');
+
+    if (win) {
+      // Vul de URL zodra alles klaar is
+      win.location.href = GLOBAL_PAYLINK;
+    } else {
+      // fallback: open in huidige tab
+      window.location.href = GLOBAL_PAYLINK;
+    }
   } finally {
-    setTimeout(() => { try { btn.disabled = false; btn.classList.remove('is-busy'); } catch {} }, 600);
+    setTimeout(() => {
+      try { btn.disabled = false; btn.classList.remove('is-busy'); } catch {}
+    }, 600);
   }
 };
 
@@ -213,13 +211,13 @@ async function loadPaymentFlags() {
   }
 }
 
-/* ---------- 🗑️ vlag wissen (admin) ---------- */
+/* ---------- ️ vlag wissen (admin) ---------- */
 window.pbClearFlag = async (userId) => {
   if (!ADMIN_MODE) return toast('❌ Alleen in admin-modus');
   try {
     const { error } = await supabase.from('payment_flags').delete().eq('user_id', userId);
     if (error) throw error;
-    toast('🗑️ Meldvlag verwijderd');
+    toast('️ Meldvlag verwijderd');
     await loadPaymentFlags();
     await renderOpenBalances();
   } catch (e) {
