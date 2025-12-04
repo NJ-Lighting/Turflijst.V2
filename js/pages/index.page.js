@@ -194,7 +194,7 @@ async function loadProducts() {
 }
 
 /* ============================================================
-   LOG DRINK (BULK + FIFO)
+   LOG DRINK (BULK + FIFO) — FIXED FOR YOUR SCHEMA
 ============================================================ */
 window.logDrink = async (productId, sellPrice, qty) => {
   const now = Date.now();
@@ -263,21 +263,23 @@ window.logDrink = async (productId, sellPrice, qty) => {
         user_id: userId,
         product_id: productId,
         price_at_purchase: entry.price_per_piece,
-        sell_price_at_purchase: sellPrice,
         batch_id: entry.batch_id,
         action_group_id: groupId
       });
     }
   });
 
+  // INSERT — FIXED (GEEN sell_price_at_purchase meer!)
   const { error: insertErr } = await supabase.from('drinks').insert(rows);
   if (insertErr) {
+    console.error("INSERT ERROR:", insertErr);
     toast('❌ Fout bij loggen');
     setUiBusy(false);
     isLogging = false;
     return;
   }
 
+  // STOCK UPDATE
   for (const p of plan) {
     await supabase
       .from('stock_batches')
@@ -364,8 +366,7 @@ window.undoLastDrink = async () => {
 
     undone = group.length;
 
-    await supabase
-      .from('drinks')
+    await supabase.from('drinks')
       .delete()
       .eq('action_group_id', last.action_group_id);
 
