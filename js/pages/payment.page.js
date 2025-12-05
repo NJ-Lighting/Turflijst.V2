@@ -25,32 +25,20 @@ document.addEventListener("DOMContentLoaded", async () => {
 function normalizePhoneInternational(num) {
   if (!num) return null;
 
-  // Strip alle niet-numerieke karakters
+  // Strip alles behalve cijfers
   num = num.replace(/[^0-9]/g, "");
 
   // --- Nederland ---
-  if (num.startsWith("06")) {
-    num = "316" + num.slice(2);
-  }
-  if (num.startsWith("00316")) {
-    num = "316" + num.slice(5);
-  }
-  if (num.startsWith("31") && num.length >= 10) {
-    return num;
-  }
+  if (num.startsWith("06")) num = "316" + num.slice(2);
+  if (num.startsWith("00316")) num = "316" + num.slice(5);
+  if (num.startsWith("31") && num.length >= 10) return num;
 
   // --- België ---
-  if (num.startsWith("04") && num.length === 10) {
-    return "324" + num.slice(2);
-  }
-  if (num.startsWith("00324")) {
-    return "324" + num.slice(5);
-  }
-  if (num.startsWith("32") && num.length >= 10) {
-    return num;
-  }
+  if (num.startsWith("04") && num.length === 10) return "324" + num.slice(2);
+  if (num.startsWith("00324")) return "324" + num.slice(5);
+  if (num.startsWith("32") && num.length >= 10) return num;
 
-  // fallback: andere landen – we laten digits zoals ze zijn
+  // fallback
   return num;
 }
 
@@ -80,9 +68,7 @@ function openWhatsappToUser(phone, link) {
   }
 
   const message = createWhatsappMessage(link);
-  const url = `https://wa.me/${normalized}?text=${encodeURIComponent(
-    message
-  )}`;
+  const url = `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
 
   window.open(url, "_blank");
 }
@@ -93,7 +79,7 @@ function openWhatsappToUser(phone, link) {
 async function computeOpenBalances(searchTerm = "") {
   const { data: users } = await supabase
     .from("users")
-    .select("id, name, phone_number")
+    .select("id, name, phone")   // <-- FIXED HERE
     .order("name", { ascending: true });
 
   const { data: rows } = await supabase
@@ -115,7 +101,7 @@ async function computeOpenBalances(searchTerm = "") {
     .map((u) => ({
       id: u.id,
       name: u.name,
-      phone: u.phone_number,
+      phone: u.phone,          // <-- FIXED HERE
       amount: sum.get(u.id) || 0,
       count: cnt.get(u.id) || 0,
     }))
@@ -135,7 +121,7 @@ async function renderOpenBalances() {
     .map((u) => {
       const uid = esc(u.id);
       const name = esc(u.name);
-      const phone = esc(u.phone || "");
+      const phone = esc(u.phone || "");   // <-- FIXED HERE
       const count = u.count;
       const amount = euro(u.amount);
 
@@ -170,7 +156,7 @@ async function renderOpenBalances() {
         `;
         adminBtns += `
           <button class="btn pb-admin-wa"
-            data-phone="${phone}"
+            data-phone="${phone}"              /* <-- FIXED */
             data-link="${GLOBAL_PAYLINK || ""}">
             Whatsapp
           </button>
@@ -195,7 +181,6 @@ async function renderOpenBalances() {
      EVENTS BINDEN
   --------------------------------------------------------- */
 
-  // Betalen
   document.querySelectorAll(".pb-pay").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const userId = btn.dataset.id;
@@ -208,12 +193,10 @@ async function renderOpenBalances() {
     });
   });
 
-  // Admin: Betaald
   document.querySelectorAll(".pb-admin-paid").forEach((btn) => {
     btn.addEventListener("click", () => pbMarkPaid(btn.dataset.id));
   });
 
-  // Admin: WhatsApp naar specifieke user
   document.querySelectorAll(".pb-admin-wa").forEach((btn) => {
     btn.addEventListener("click", () => {
       const phone = btn.dataset.phone;
@@ -222,7 +205,6 @@ async function renderOpenBalances() {
     });
   });
 
-  // Admin: Flag verwijderen
   document.querySelectorAll(".pb-admin-clear").forEach((btn) => {
     btn.addEventListener("click", () => pbClearFlag(btn.dataset.id));
   });
@@ -244,7 +226,7 @@ function toggleAdminMode() {
 --------------------------------------------------------- */
 window.pbMarkPaid = async (userId) => {
   const balances = await computeOpenBalances("");
-  const entry = balances.find((b) => b.id == userId);
+  ￼const entry = balances.find((b) => b.id == userId);
   const amount = entry?.amount || 0;
 
   if (amount <= 0) return toast("Geen openstaand saldo");
@@ -256,7 +238,7 @@ window.pbMarkPaid = async (userId) => {
   toast(`✅ Betaald: ${euro(amount)}`);
 
   await loadPaymentFlags();
-  renderOpenBalances();
+  await renderOpenBalances();
 };
 
 /* ---------------------------------------------------------
@@ -303,5 +285,5 @@ window.pbClearFlag = async (userId) => {
   await supabase.from("payment_flags").delete().eq("user_id", userId);
   toast("❌ Flag verwijderd");
   await loadPaymentFlags();
-  renderOpenBalances();
+  await renderOpenBalances();
 };
