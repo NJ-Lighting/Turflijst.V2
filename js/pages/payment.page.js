@@ -1,445 +1,242 @@
-import { $, toast, euro, esc } from '../core.js';
-import { supabase } from '../supabase.client.js';
-import { fetchUserDrinkPivot, fetchUserTotalsCurrentPrice } from '../api/metrics.js';
+// /js/pages/payment.page.js
+import { $, euro, esc, toast } from "../core.js";
+import { supabase } from "../supabase.client.js";
+import { openPaymentWindow } from "../payments/open-payment.js";
 
-/* ============================================================
+let GLOBAL_PAYLINK = null;
+let PAYMENT_FLAGS = new Map();
+let ADMIN_MODE = false;
+
+/* ---------------------------------------------------------
    INIT
-============================================================ */
-document.addEventListener('DOMContentLoaded', async () => {
-  await loadUsers();
-  await loadProducts();
+--------------------------------------------------------- */
+document.addEventListener("DOMContentLoaded", async () => {
+  await loadGlobalPayLink();
+  await loadPaymentFlags();
+  await renderOpenBalances();
 
-  initQuantityControls();
-  updateQuantityDisplay();
-
-  $('#user')?.addEventListener('change', () => {
-    renderTotalsFromMetrics();
-    renderPivotFromMetrics();
-  });
-
-  await renderTotalsFromMetrics();
-  await renderPivotFromMetrics();
+  $("#pb-search")?.addEventListener("input", renderOpenBalances);
+  $("#pb-admin")?.addEventListener("click", toggleAdminMode);
 });
 
-/* ============================================================
-   GLOBAL STATE
-============================================================ */
-let isLogging = false;
-let isUndoing = false;
-let lastLogAt = 0;
-let lastUndoAt = 0;
-const THROTTLE_MS = 600;
+/* ---------------------------------------------------------
+   SALDI BEREKENEN
+--------------------------------------------------------- */
+async function computeOpenBalances(searchTerm = "") {
+  const { data: users } = await supabase
+    .from("users")
+    .select("id, name")
+    .order("name", { ascending: true });
 
-let canUndo = false;
+  const { data: rows } = await supabase
+    .from("drinks")
+    .select("user_id, price_at_purchase, products(price)");
 
-let currentQuantity = 1;
-const MIN_QTY = 1;
-const MAX_QTY = 20;
+  const sum = new Map();
+  const cnt = new Map();
 
-/* ============================================================
-   HELPERS
-============================================================ */
-function setUiBusy(busy) {
-  document.querySelectorAll('#product-buttons button.btn')
-    .forEach(b => b.disabled = busy);
-
-  const undoBtn = $('#undo-btn');
-  if (undoBtn) undoBtn.disabled = busy;
-
-  const grid = $('#product-buttons');
-  if (grid) {
-    grid.style.pointerEvents = busy ? 'none' : '';
-    grid.setAttribute('aria-busy', busy ? 'true' : 'false');
-  }
-}
-
-function generateActionGroupId() {
-  if (crypto?.randomUUID) return crypto.randomUUID();
-  return `ag-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function updateQuantityDisplay() {
-  const el = $('#quantity-display');
-  if (el) el.textContent = String(currentQuantity);
-}
-
-/* ============================================================
-   QUANTITY CONTROLS
-============================================================ */
-function initQuantityControls() {
-  const undoBtn = $('#undo-btn');
-  if (!undoBtn) return;
-  if ($('#quantity-controls')) return;
-
-  const div = document.createElement('div');
-  div.id = 'quantity-controls';
-  div.className = 'quantity-controls';
-  div.innerHTML = `
-    <div class="quantity-label">Aantal:</div>
-    <div class="quantity-input">
-      <button type="button" class="btn quantity-minus">-</button>
-      <span id="quantity-display" aria-live="polite">1</span>
-      <button type="button" class="btn quantity-plus">+</button>
-    </div>
-  `;
-
-  undoBtn.parentNode.insertBefore(div, undoBtn);
-
-  div.querySelector('.quantity-minus')?.addEventListener('click', () => {
-    if (currentQuantity > MIN_QTY) {
-      currentQuantity--;
-      updateQuantityDisplay();
-    }
+  (rows || []).forEach((r) => {
+    const price = Number(r?.price_at_purchase ?? r?.products?.price ?? 0);
+    sum.set(r.user_id, (sum.get(r.user_id) || 0) + price);
+    cnt.set(r.user_id, (cnt.get(r.user_id) || 0) + 1);
   });
 
-  div.querySelector('.quantity-plus')?.addEventListener('click', () => {
-    if (currentQuantity < MAX_QTY) {
-      currentQuantity++;
-      updateQuantityDisplay();
-    }
-  });
+  const q = searchTerm.trim().toLowerCase();
+
+  return (users || [])
+    .map((u) => ({
+      id: u.id,
+      name: u.name,
+      amount: sum.get(u.id) || 0,
+      count: cnt.get(u.id) || 0,
+    }))
+    .filter((u) => !q || u.name.toLowerCase().includes(q))
+    .filter((u) => u.amount > 0)
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/* ============================================================
-   USERS DROPDOWN
-============================================================ */
-async function loadUsers() {
-  const { data: users, error } = await supabase
-    .from('users')
-    .select('id, name, "WIcreations"');
+/* ---------------------------------------------------------
+   TABEL RENDEREN
+--------------------------------------------------------- */
+async function renderOpenBalances() {
+  const search = $("#pb-search")?.value || "";
+  const list = await computeOpenBalances(search);
 
-  if (error) return console.error(error);
+  const rows = list
+    .map((u) => {
+      const uid = esc(u.id);
+      const name = esc(u.name);
+      const count = u.count;
+      const amount = euro(u.amount);
 
-  const sel = $('#user');
-  if (!sel) return;
+      const flagISO = PAYMENT_FLAGS.get(u.id) || null;
+      const flagTxt = flagISO
+        ? new Date(flagISO).toLocaleString("nl-NL")
+        : null;
 
-  const coll = new Intl.Collator('nl', { sensitivity: 'base' });
+      const attemptCell = flagISO
+        ? `${flagTxt} ${
+            ADMIN_MODE
+              ? `<button class="btn pb-admin-clear" data-id="${uid}">❌</button>`
+              : ""
+          }`
+        : "—";
 
-  const sorted = users.slice().sort((a, b) => {
-    if (!!a.WIcreations !== !!b.WIcreations) return a.WIcreations ? -1 : 1;
-    return coll.compare(a.name, b.name);
-  });
+      const btnPay = `
+        <button class="btn pb-pay"
+          data-id="${uid}"
+          data-name="${name}"
+          data-amount="${u.amount}">
+          Betalen
+        </button>
+      `;
 
-  const parts = [`<option value="">-- Kies gebruiker --</option>`];
-  let splitDone = false;
+      let adminBtns = "";
+      if (ADMIN_MODE) {
+        adminBtns += `
+          <button class="btn pb-admin-paid" data-id="${uid}">Betaald</button>
+        `;
+        adminBtns += `
+          <button class="btn pb-admin-wa"
+            data-name="${name}"
+            data-link="${GLOBAL_PAYLINK || ""}">
+            Whatsapp
+          </button>
+        `;
+      }
 
-  sorted.forEach(u => {
-    if (!u.WIcreations && !splitDone) {
-      parts.push(`<option disabled>────────────</option>`);
-      splitDone = true;
-    }
-    parts.push(`<option value="${u.id}">${esc(u.name)}</option>`);
-  });
+      return `
+        <tr>
+          <td>${name}</td>
+          <td>${count}</td>
+          <td>${amount}</td>
+          <td>${attemptCell}</td>
+          <td>${btnPay}${adminBtns}</td>
+        </tr>
+      `;
+    })
+    .join("");
 
-  sel.innerHTML = parts.join('');
-}
+  $("#pb-rows").innerHTML = rows;
 
-/* ============================================================
-   LOAD PRODUCTS (buttons)
-============================================================ */
-async function loadProducts() {
-  const [{ data: products }, { data: batches }] = await Promise.all([
-    supabase.from('products').select('id, name, price, image_url').order('name'),
-    supabase.from('stock_batches').select('product_id, quantity').gt('quantity', 0)
-  ]);
+  /* ---------------------------------------------------------
+     EVENTS BINDEN
+  --------------------------------------------------------- */
 
-  const stockMap = new Map();
-  batches?.forEach(b => {
-    stockMap.set(b.product_id, (stockMap.get(b.product_id) || 0) + Number(b.quantity));
-  });
+  // Betalen
+  document.querySelectorAll(".pb-pay").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const userId = btn.dataset.id;
 
-  const grid = $('#product-buttons');
-  if (!grid) return;
+      await flagPaymentAttempt(userId);
+      await loadPaymentFlags();
+      await renderOpenBalances();
 
-  grid.innerHTML = '';
-  grid.classList.add('product-grid');
-
-  const BUCKET = "https://stmpommlhkokcjkwivfc.supabase.co/storage/v1/object/public/product-images/";
-
-  products
-    ?.filter(p => (stockMap.get(p.id) || 0) > 0)
-    .forEach(p => {
-      const wrap = document.createElement('div');
-      const btn = document.createElement('button');
-      btn.className = 'btn drink-btn';
-
-      const img = p.image_url
-        ? `<img src="${BUCKET}${encodeURIComponent(p.image_url)}" class="drink-img">`
-        : '';
-
-      btn.innerHTML = `${img} ${esc(p.name)} ${euro(p.price)}`;
-
-      btn.addEventListener('click', async () => {
-        btn.disabled = true;
-        try {
-          await logDrink(p.id, p.price, currentQuantity);
-        } finally {
-          btn.disabled = false;
-        }
-      });
-
-      wrap.appendChild(btn);
-      grid.appendChild(wrap);
+      openPaymentWindow(GLOBAL_PAYLINK);
     });
-}
-
-/* ============================================================
-   LOG DRINK (BULK + FIFO + GROUP UNDO)
-============================================================ */
-window.logDrink = async (productId, sellPrice, qty) => {
-  const now = Date.now();
-  if (isLogging || now - lastLogAt < THROTTLE_MS) return;
-
-  lastLogAt = now;
-  isLogging = true;
-  setUiBusy(true);
-
-  qty = Math.max(MIN_QTY, Math.min(MAX_QTY, Number(qty) || 1));
-
-  const userId = $('#user').value;
-  if (!userId) {
-    toast('⚠️ Kies eerst een gebruiker');
-    setUiBusy(false);
-    isLogging = false;
-    return;
-  }
-
-  const { data: batches } = await supabase
-    .from('stock_batches')
-    .select('id, quantity, price_per_piece')
-    .eq('product_id', productId)
-    .gt('quantity', 0)
-    .order('created_at');
-
-  if (!batches?.length) {
-    toast('❌ Geen voorraad voor dit product');
-    setUiBusy(false);
-    isLogging = false;
-    return;
-  }
-
-  const total = batches.reduce((sum, b) => sum + Number(b.quantity), 0);
-  if (total < qty) {
-    toast('❌ Niet genoeg voorraad');
-    setUiBusy(false);
-    isLogging = false;
-    return;
-  }
-
-  let remaining = qty;
-  const plan = [];
-
-  for (const b of batches) {
-    const available = Number(b.quantity);
-    const use = Math.min(available, remaining);
-
-    if (use > 0) {
-      plan.push({
-        batch_id: b.id,
-        count: use,
-        startQty: available,
-        price_per_piece: b.price_per_piece
-      });
-      remaining -= use;
-      if (remaining === 0) break;
-    }
-  }
-
-  const groupId = generateActionGroupId();
-  const rows = [];
-
-  plan.forEach(entry => {
-    for (let i = 0; i < entry.count; i++) {
-      rows.push({
-        user_id: userId,
-        product_id: productId,
-        price_at_purchase: entry.price_per_piece,
-        sell_price_at_purchase: sellPrice,
-        batch_id: entry.batch_id,
-        action_group_id: groupId
-      });
-    }
   });
 
-  // INSERT
-  const { error: insertErr } = await supabase.from('drinks').insert(rows);
-  if (insertErr) {
-    toast('❌ Fout bij loggen');
-    setUiBusy(false);
-    isLogging = false;
-    return;
-  }
+  // Admin: Betaald
+  document.querySelectorAll(".pb-admin-paid").forEach((btn) => {
+    btn.addEventListener("click", () => pbMarkPaid(btn.dataset.id));
+  });
 
-  // UPDATE batches
-  for (const p of plan) {
-    await supabase
-      .from('stock_batches')
-      .update({ quantity: p.startQty - p.count })
-      .eq('id', p.batch_id);
-  }
+  // Admin: WhatsApp
+  document.querySelectorAll(".pb-admin-wa").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const msg = `Hola!!!
+Het is heus het is waar, het moment is daar. 
+Bij deze het betaalverzoek voor de drankjes uit de WI-koelkast, bij 40-45.
 
-  await loadProducts();
-  currentQuantity = 1;
-  updateQuantityDisplay();
+${btn.dataset.link}
 
-  toast(qty === 1 ? '✅ Drankje toegevoegd' : `✅ ${qty} drankjes toegevoegd`);
+Alvast bedankt!!
+Nick Jonker`;
 
-  await renderTotalsFromMetrics();
-  await renderPivotFromMetrics();
+      window.open(
+        `https://wa.me/?text=${encodeURIComponent(msg)}`,
+        "_blank"
+      );
+    });
+  });
 
-  canUndo = true;
-  setUiBusy(false);
-  isLogging = false;
+  // Admin: Flag verwijderen
+  document.querySelectorAll(".pb-admin-clear").forEach((btn) => {
+    btn.addEventListener("click", () => pbClearFlag(btn.dataset.id));
+  });
+}
+
+/* ---------------------------------------------------------
+   ADMIN MODUS
+--------------------------------------------------------- */
+function toggleAdminMode() {
+  const pin = prompt("Voer admin-PIN in:");
+  if (pin !== "0000") return toast("❌ Onjuiste PIN");
+
+  ADMIN_MODE = !ADMIN_MODE;
+  renderOpenBalances();
+}
+
+/* ---------------------------------------------------------
+   ADMIN: BETAALD
+--------------------------------------------------------- */
+window.pbMarkPaid = async (userId) => {
+  const balances = await computeOpenBalances("");
+  const entry = balances.find((b) => b.id == userId);
+  const amount = entry?.amount || 0;
+
+  if (amount <= 0) return toast("Geen openstaand saldo");
+
+  await supabase.from("payments").insert([{ user_id: userId, amount }]);
+  await supabase.from("drinks").delete().eq("user_id", userId);
+  await supabase.from("payment_flags").delete().eq("user_id", userId);
+
+  toast(`✅ Betaald: ${euro(amount)}`);
+
+  await loadPaymentFlags();
+  renderOpenBalances();
 };
 
-/* ============================================================
-   UNDO (COMPLETE ACTION GROUP)
-============================================================ */
-window.undoLastDrink = async (el) => {
-  if (!canUndo) return toast('Niets om ongedaan te maken');
-
-  const now = Date.now();
-  if (isUndoing || now - lastUndoAt < THROTTLE_MS) return;
-
-  lastUndoAt = now;
-  isUndoing = true;
-  setUiBusy(true);
-
-  const { data: last } = await supabase
-    .from('drinks')
-    .select('id, product_id, batch_id, price_at_purchase, action_group_id')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  if (!last) {
-    toast('Geen gegevens');
-    setUiBusy(false);
-    isUndoing = false;
-    return;
-  }
-
-  let undone = 1;
-
-  if (!last.action_group_id) {
-    // oude manier (1 record)
-    await supabase.from('drinks').delete().eq('id', last.id);
-    await restoreBatch(last);
-  } else {
-    // nieuwe manier: hele groep
-    const { data: groupRows } = await supabase
-      .from('drinks')
-      .select('id, product_id, batch_id, price_at_purchase')
-      .eq('action_group_id', last.action_group_id);
-
-    undone = groupRows.length;
-
-    await supabase
-      .from('drinks')
-      .delete()
-      .eq('action_group_id', last.action_group_id);
-
-    for (const row of groupRows) {
-      await restoreBatch(row);
-    }
-  }
-
-  await loadProducts();
-  await renderTotalsFromMetrics();
-  await renderPivotFromMetrics();
-
-  toast(
-    undone === 1
-      ? '⏪ Laatste drankje verwijderd'
-      : `⏪ Laatste actie verwijderd (${undone} drankjes)`
-  );
-
-  canUndo = false;
-  setUiBusy(false);
-  isUndoing = false;
-};
-
-async function restoreBatch(row) {
-  if (row.batch_id) {
-    const { data: b } = await supabase
-      .from('stock_batches')
-      .select('id, quantity')
-      .eq('id', row.batch_id)
+/* ---------------------------------------------------------
+   BETAALLINK LADEN
+--------------------------------------------------------- */
+async function loadGlobalPayLink() {
+  try {
+    const { data } = await supabase
+      .from("view_payment_link_latest")
+      .select("link")
       .maybeSingle();
-
-    if (b) {
-      await supabase
-        .from('stock_batches')
-        .update({ quantity: Number(b.quantity) + 1 })
-        .eq('id', b.id);
-      return;
-    }
-  }
-
-  await supabase.from('stock_batches').insert([{
-    product_id: row.product_id,
-    quantity: 1,
-    price_per_piece: row.price_at_purchase
-  }]);
-}
-
-/* ============================================================
-   TOTALS TABLE
-============================================================ */
-async function renderTotalsFromMetrics() {
-  try {
-    const rows = await fetchUserTotalsCurrentPrice(supabase);
-
-    const body = (rows || [])
-      .map(r => `
-        <tr>
-          <td>${esc(r.name)}</td>
-          <td style="text-align:right">${euro(r.amount)}</td>
-        </tr>
-      `)
-      .join('');
-
-    $('#totalToPayList').innerHTML =
-      body || `<tr><td colspan="2">Nog geen data</td></tr>`;
-
-  } catch (e) {
-    console.error(e);
-    $('#totalToPayList').innerHTML =
-      `<tr><td colspan="2">Kon niet laden</td></tr>`;
+    GLOBAL_PAYLINK = data?.link || null;
+  } catch {
+    GLOBAL_PAYLINK = null;
   }
 }
 
-/* ============================================================
-   PIVOT TABLE
-============================================================ */
-async function renderPivotFromMetrics() {
-  try {
-    const { products, rows } = await fetchUserDrinkPivot(supabase);
+/* ---------------------------------------------------------
+   FLAG FUNCTIES
+--------------------------------------------------------- */
+async function flagPaymentAttempt(userId) {
+  const ts = new Date().toISOString();
+  PAYMENT_FLAGS.set(userId, ts);
 
-    $('#userDrinkTotalsHead').innerHTML = `
-      <tr>
-        <th>Gebruiker</th>
-        ${products.map(p => `<th>${esc(p)}</th>`).join('')}
-      </tr>
-    `;
-
-    const bodyHtml = rows
-      .map(r => `
-        <tr>
-          <td>${esc(r.user)}</td>
-          ${r.counts.map(c => `<td>${c}</td>`).join('')}
-        </tr>
-      `)
-      .join('');
-
-    $('#userDrinkTotalsBody').innerHTML =
-      bodyHtml ||
-      `<tr><td colspan="${products.length + 1}">Nog geen data</td></tr>`;
-
-  } catch (e) {
-    console.error(e);
-    $('#userDrinkTotalsHead').innerHTML = ``;
-    $('#userDrinkTotalsBody').innerHTML =
-      `<tr><td colspan="99">Kon gegevens niet laden</td></tr>`;
-  }
+  await supabase.from("payment_flags").upsert(
+    { user_id: userId, attempted_at: ts },
+    { onConflict: "user_id" }
+  );
 }
+
+async function loadPaymentFlags() {
+  PAYMENT_FLAGS.clear();
+  const { data } = await supabase
+    .from("payment_flags")
+    .select("user_id, attempted_at");
+
+  for (const r of data || []) PAYMENT_FLAGS.set(r.user_id, r.attempted_at);
+}
+
+window.pbClearFlag = async (userId) => {
+  await supabase.from("payment_flags").delete().eq("user_id", userId);
+  toast("❌ Flag verwijderd");
+  await loadPaymentFlags();
+  renderOpenBalances();
+};
