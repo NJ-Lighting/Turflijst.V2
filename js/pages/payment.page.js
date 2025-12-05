@@ -25,66 +25,57 @@ document.addEventListener("DOMContentLoaded", async () => {
 function normalizePhoneInternational(num) {
   if (!num) return null;
 
-  // verwijder alles behalve cijfers
   num = num.replace(/[^0-9]/g, "");
 
-  // ------- Nederland -------
-  if (num.startsWith("06")) {
-    num = "316" + num.slice(2);
-  }
-  if (num.startsWith("00316")) {
-    num = "316" + num.slice(5);
-  }
-  if (num.startsWith("31") && num.length >= 10) {
-    return num;
-  }
+  // Nederland
+  if (num.startsWith("06")) return "316" + num.slice(2);
+  if (num.startsWith("00316")) return "316" + num.slice(5);
+  if (num.startsWith("31") && num.length >= 10) return num;
 
-  // ------- België -------
-  if (num.startsWith("04") && num.length === 10) {
-    return "324" + num.slice(2);
-  }
-  if (num.startsWith("00324")) {
-    return "324" + num.slice(5);
-  }
-  if (num.startsWith("32") && num.length >= 10) {
-    return num;
-  }
+  // België
+  if (num.startsWith("04") && num.length === 10) return "324" + num.slice(2);
+  if (num.startsWith("00324")) return "324" + num.slice(5);
+  if (num.startsWith("32") && num.length >= 10) return num;
 
-  // fallback voor internationale nummers
+  // fallback
   return num;
 }
 
 /* ---------------------------------------------------------
-   WHATSAPP BERICHT MAKEN
+   WHATSAPP BERICHT MET PAYMENT PAGINA-LINK
 --------------------------------------------------------- */
-function createWhatsappMessage(link) {
+function createWhatsappMessage() {
+  const paymentURL = `${window.location.origin}/payment.html`;
+
   return `Hola!!!
 Het is heus het is waar, het moment is daar. 
 Bij deze het betaalverzoek voor de drankjes uit de WI-koelkast, bij 40-45.
 
-${link}
+${paymentURL}
 
 Alvast bedankt!!
 Nick Jonker`;
 }
 
 /* ---------------------------------------------------------
-   WHATSAPP NAAR SPECIFIEKE USER
+   WHATSAPP OPENEN NAAR USER
 --------------------------------------------------------- */
-function openWhatsappToUser(phone, link) {
+function openWhatsappToUser(phone) {
   const normalized = normalizePhoneInternational(phone);
+
   if (!normalized) {
     alert("⚠️ Geen geldig telefoonnummer bij deze gebruiker");
     return;
   }
 
-  const msg = createWhatsappMessage(link);
+  const msg = createWhatsappMessage();
   const url = `https://wa.me/${normalized}?text=${encodeURIComponent(msg)}`;
+
   window.open(url, "_blank");
 }
 
 /* ---------------------------------------------------------
-   SALDI OPHALEN EN BEREKENEN
+   SALDI BEREKENEN
 --------------------------------------------------------- */
 async function computeOpenBalances(searchTerm = "") {
   const { data: users } = await supabase
@@ -127,18 +118,15 @@ async function renderOpenBalances() {
   const search = $("#pb-search")?.value || "";
   const list = await computeOpenBalances(search);
 
-  const html = list
+  const rowsHTML = list
     .map((u) => {
       const uid = esc(u.id);
       const name = esc(u.name);
       const phone = esc(u.phone || "");
-      const count = u.count;
       const amount = euro(u.amount);
 
       const flagISO = PAYMENT_FLAGS.get(u.id);
-      const flagTxt = flagISO
-        ? new Date(flagISO).toLocaleString("nl-NL")
-        : "—";
+      const flagTxt = flagISO ? new Date(flagISO).toLocaleString("nl-NL") : "—";
 
       const attemptCell = flagISO
         ? `${flagTxt} ${
@@ -151,11 +139,9 @@ async function renderOpenBalances() {
       const payBtn = `
         <button class="btn pb-pay"
           data-id="${uid}"
-          data-name="${name}"
           data-amount="${u.amount}">
           Betalen
-        </button>
-      `;
+        </button>`;
 
       let adminBtns = "";
       if (ADMIN_MODE) {
@@ -163,11 +149,9 @@ async function renderOpenBalances() {
           <button class="btn pb-admin-paid" data-id="${uid}">
             Betaald
           </button>
-        `;
-        adminBtns += `
+
           <button class="btn pb-admin-wa"
-            data-phone="${phone}"
-            data-link="${GLOBAL_PAYLINK}">
+            data-phone="${phone}">
             Whatsapp
           </button>
         `;
@@ -176,25 +160,23 @@ async function renderOpenBalances() {
       return `
         <tr>
           <td>${name}</td>
-          <td>${count}</td>
+          <td>${u.count}</td>
           <td>${amount}</td>
           <td>${attemptCell}</td>
           <td>${payBtn}${adminBtns}</td>
-        </tr>
-      `;
+        </tr>`;
     })
     .join("");
 
-  $("#pb-rows").innerHTML = html;
+  $("#pb-rows").innerHTML = rowsHTML;
 
   bindEvents();
 }
 
 /* ---------------------------------------------------------
-   EVENT LISTENERS BINDEN
+   EVENTS BINDEN
 --------------------------------------------------------- */
 function bindEvents() {
-  // Betalen
   document.querySelectorAll(".pb-pay").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const userId = btn.dataset.id;
@@ -207,43 +189,34 @@ function bindEvents() {
     });
   });
 
-  // Admin: Betaald
   document.querySelectorAll(".pb-admin-paid").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      pbMarkPaid(btn.dataset.id);
-    });
+    btn.addEventListener("click", () => pbMarkPaid(btn.dataset.id));
   });
 
-  // Admin: WhatsApp
   document.querySelectorAll(".pb-admin-wa").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const phone = btn.dataset.phone;
-      const link = btn.dataset.link;
-
-      openWhatsappToUser(phone, link);
+      openWhatsappToUser(btn.dataset.phone);
     });
   });
 
-  // Admin: Flag verwijderen
   document.querySelectorAll(".pb-admin-clear").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      pbClearFlag(btn.dataset.id);
-    });
+    btn.addEventListener("click", () => pbClearFlag(btn.dataset.id));
   });
 }
 
 /* ---------------------------------------------------------
-   ADMIN MODUS
+   ADMIN-MODUS
 --------------------------------------------------------- */
 function toggleAdminMode() {
   const pin = prompt("Voer admin-PIN in:");
   if (pin !== "0000") return toast("❌ Onjuiste PIN");
+
   ADMIN_MODE = !ADMIN_MODE;
   renderOpenBalances();
 }
 
 /* ---------------------------------------------------------
-   ADMIN: BETAALD
+   ADMIN: MARK AS PAID
 --------------------------------------------------------- */
 window.pbMarkPaid = async (userId) => {
   const balances = await computeOpenBalances("");
@@ -266,16 +239,12 @@ window.pbMarkPaid = async (userId) => {
    BETAALLINK LADEN
 --------------------------------------------------------- */
 async function loadGlobalPayLink() {
-  try {
-    const { data } = await supabase
-      .from("view_payment_link_latest")
-      .select("link")
-      .maybeSingle();
+  const { data } = await supabase
+    .from("view_payment_link_latest")
+    .select("link")
+    .maybeSingle();
 
-    GLOBAL_PAYLINK = data?.link || null;
-  } catch {
-    GLOBAL_PAYLINK = null;
-  }
+  GLOBAL_PAYLINK = data?.link || null;
 }
 
 /* ---------------------------------------------------------
@@ -283,12 +252,16 @@ async function loadGlobalPayLink() {
 --------------------------------------------------------- */
 async function flagPaymentAttempt(userId) {
   const ts = new Date().toISOString();
-  PAYMENT_FLAGS.set(userId, ts);
 
   await supabase.from("payment_flags").upsert(
-    { user_id: userId, attempted_at: ts },
+    {
+      user_id: userId,
+      attempted_at: ts,
+    },
     { onConflict: "user_id" }
   );
+
+  PAYMENT_FLAGS.set(userId, ts);
 }
 
 async function loadPaymentFlags() {
@@ -305,6 +278,7 @@ async function loadPaymentFlags() {
 
 window.pbClearFlag = async (userId) => {
   await supabase.from("payment_flags").delete().eq("user_id", userId);
+
   toast("❌ Flag verwijderd");
   await loadPaymentFlags();
   await renderOpenBalances();
