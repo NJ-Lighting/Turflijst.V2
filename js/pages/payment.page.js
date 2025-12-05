@@ -20,25 +20,37 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 /* ---------------------------------------------------------
-   TELEFOONNUMMER NORMALISATIE (INTERNATIONAAL)
+   INTERNATIONAAL TELEFOONNUMMER NORMALISEREN
 --------------------------------------------------------- */
 function normalizePhoneInternational(num) {
   if (!num) return null;
 
-  // Strip alles behalve cijfers
+  // verwijder alles behalve cijfers
   num = num.replace(/[^0-9]/g, "");
 
-  // --- Nederland ---
-  if (num.startsWith("06")) num = "316" + num.slice(2);
-  if (num.startsWith("00316")) num = "316" + num.slice(5);
-  if (num.startsWith("31") && num.length >= 10) return num;
+  // ------- Nederland -------
+  if (num.startsWith("06")) {
+    num = "316" + num.slice(2);
+  }
+  if (num.startsWith("00316")) {
+    num = "316" + num.slice(5);
+  }
+  if (num.startsWith("31") && num.length >= 10) {
+    return num;
+  }
 
-  // --- België ---
-  if (num.startsWith("04") && num.length === 10) return "324" + num.slice(2);
-  if (num.startsWith("00324")) return "324" + num.slice(5);
-  if (num.startsWith("32") && num.length >= 10) return num;
+  // ------- België -------
+  if (num.startsWith("04") && num.length === 10) {
+    return "324" + num.slice(2);
+  }
+  if (num.startsWith("00324")) {
+    return "324" + num.slice(5);
+  }
+  if (num.startsWith("32") && num.length >= 10) {
+    return num;
+  }
 
-  // fallback
+  // fallback voor internationale nummers
   return num;
 }
 
@@ -57,29 +69,27 @@ Nick Jonker`;
 }
 
 /* ---------------------------------------------------------
-   WHATSAPP NAAR GEBRUIKER
+   WHATSAPP NAAR SPECIFIEKE USER
 --------------------------------------------------------- */
 function openWhatsappToUser(phone, link) {
   const normalized = normalizePhoneInternational(phone);
-
   if (!normalized) {
     alert("⚠️ Geen geldig telefoonnummer bij deze gebruiker");
     return;
   }
 
-  const message = createWhatsappMessage(link);
-  const url = `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
-
+  const msg = createWhatsappMessage(link);
+  const url = `https://wa.me/${normalized}?text=${encodeURIComponent(msg)}`;
   window.open(url, "_blank");
 }
 
 /* ---------------------------------------------------------
-   SALDI BEREKENEN
+   SALDI OPHALEN EN BEREKENEN
 --------------------------------------------------------- */
 async function computeOpenBalances(searchTerm = "") {
   const { data: users } = await supabase
     .from("users")
-    .select("id, name, phone")   // <-- FIXED HERE
+    .select("id, name, phone")
     .order("name", { ascending: true });
 
   const { data: rows } = await supabase
@@ -101,7 +111,7 @@ async function computeOpenBalances(searchTerm = "") {
     .map((u) => ({
       id: u.id,
       name: u.name,
-      phone: u.phone,          // <-- FIXED HERE
+      phone: u.phone,
       amount: sum.get(u.id) || 0,
       count: cnt.get(u.id) || 0,
     }))
@@ -117,18 +127,18 @@ async function renderOpenBalances() {
   const search = $("#pb-search")?.value || "";
   const list = await computeOpenBalances(search);
 
-  const rows = list
+  const html = list
     .map((u) => {
       const uid = esc(u.id);
       const name = esc(u.name);
-      const phone = esc(u.phone || "");   // <-- FIXED HERE
+      const phone = esc(u.phone || "");
       const count = u.count;
       const amount = euro(u.amount);
 
-      const flagISO = PAYMENT_FLAGS.get(u.id) || null;
+      const flagISO = PAYMENT_FLAGS.get(u.id);
       const flagTxt = flagISO
         ? new Date(flagISO).toLocaleString("nl-NL")
-        : null;
+        : "—";
 
       const attemptCell = flagISO
         ? `${flagTxt} ${
@@ -138,7 +148,7 @@ async function renderOpenBalances() {
           }`
         : "—";
 
-      const btnPay = `
+      const payBtn = `
         <button class="btn pb-pay"
           data-id="${uid}"
           data-name="${name}"
@@ -156,8 +166,8 @@ async function renderOpenBalances() {
         `;
         adminBtns += `
           <button class="btn pb-admin-wa"
-            data-phone="${phone}"              /* <-- FIXED */
-            data-link="${GLOBAL_PAYLINK || ""}">
+            data-phone="${phone}"
+            data-link="${GLOBAL_PAYLINK}">
             Whatsapp
           </button>
         `;
@@ -169,18 +179,22 @@ async function renderOpenBalances() {
           <td>${count}</td>
           <td>${amount}</td>
           <td>${attemptCell}</td>
-          <td>${btnPay}${adminBtns}</td>
+          <td>${payBtn}${adminBtns}</td>
         </tr>
       `;
     })
     .join("");
 
-  $("#pb-rows").innerHTML = rows;
+  $("#pb-rows").innerHTML = html;
 
-  /* ---------------------------------------------------------
-     EVENTS BINDEN
-  --------------------------------------------------------- */
+  bindEvents();
+}
 
+/* ---------------------------------------------------------
+   EVENT LISTENERS BINDEN
+--------------------------------------------------------- */
+function bindEvents() {
+  // Betalen
   document.querySelectorAll(".pb-pay").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const userId = btn.dataset.id;
@@ -193,20 +207,28 @@ async function renderOpenBalances() {
     });
   });
 
+  // Admin: Betaald
   document.querySelectorAll(".pb-admin-paid").forEach((btn) => {
-    btn.addEventListener("click", () => pbMarkPaid(btn.dataset.id));
+    btn.addEventListener("click", () => {
+      pbMarkPaid(btn.dataset.id);
+    });
   });
 
+  // Admin: WhatsApp
   document.querySelectorAll(".pb-admin-wa").forEach((btn) => {
     btn.addEventListener("click", () => {
       const phone = btn.dataset.phone;
       const link = btn.dataset.link;
+
       openWhatsappToUser(phone, link);
     });
   });
 
+  // Admin: Flag verwijderen
   document.querySelectorAll(".pb-admin-clear").forEach((btn) => {
-    btn.addEventListener("click", () => pbClearFlag(btn.dataset.id));
+    btn.addEventListener("click", () => {
+      pbClearFlag(btn.dataset.id);
+    });
   });
 }
 
@@ -216,7 +238,6 @@ async function renderOpenBalances() {
 function toggleAdminMode() {
   const pin = prompt("Voer admin-PIN in:");
   if (pin !== "0000") return toast("❌ Onjuiste PIN");
-
   ADMIN_MODE = !ADMIN_MODE;
   renderOpenBalances();
 }
@@ -226,7 +247,7 @@ function toggleAdminMode() {
 --------------------------------------------------------- */
 window.pbMarkPaid = async (userId) => {
   const balances = await computeOpenBalances("");
-  ￼const entry = balances.find((b) => b.id == userId);
+  const entry = balances.find((a) => a.id === userId);
   const amount = entry?.amount || 0;
 
   if (amount <= 0) return toast("Geen openstaand saldo");
@@ -250,6 +271,7 @@ async function loadGlobalPayLink() {
       .from("view_payment_link_latest")
       .select("link")
       .maybeSingle();
+
     GLOBAL_PAYLINK = data?.link || null;
   } catch {
     GLOBAL_PAYLINK = null;
