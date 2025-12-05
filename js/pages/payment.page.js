@@ -20,12 +20,66 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 /* ---------------------------------------------------------
+   TELEFOONNUMMER NORMALISATIE (INTERNATIONAAL)
+--------------------------------------------------------- */
+function normalizePhoneInternational(num) {
+  if (!num) return null;
+
+  // strip alle niet-numerieke karakters
+  num = num.replace(/[^0-9]/g, "");
+
+  // --- Nederland ---
+  if (num.startsWith("06")) num = "316" + num.slice(2);
+  if (num.startsWith("00316")) num = "316" + num.slice(5);
+  if (num.startsWith("31") && num.length >= 10) return num;
+
+  // --- België ---
+  if (num.startsWith("04") && num.length === 10) return "324" + num.slice(2);
+  if (num.startsWith("00324")) return "324" + num.slice(5);
+  if (num.startsWith("32") && num.length >= 10) return num;
+
+  // fallback
+  return num;
+}
+
+/* ---------------------------------------------------------
+   WHATSAPP BERICHT MAKEN
+--------------------------------------------------------- */
+function createWhatsappMessage(link) {
+  return `Hola!!!
+Het is heus het is waar, het moment is daar. 
+Bij deze het betaalverzoek voor de drankjes uit de WI-koelkast, bij 40-45.
+
+${link}
+
+Alvast bedankt!!
+Nick Jonker`;
+}
+
+/* ---------------------------------------------------------
+   WHATSAPP NAAR GEBRUIKER
+--------------------------------------------------------- */
+function openWhatsappToUser(phone, link) {
+  const normalized = normalizePhoneInternational(phone);
+
+  if (!normalized) {
+    alert("⚠️ Geen geldig telefoonnummer bij deze gebruiker");
+    return;
+  }
+
+  const message = createWhatsappMessage(link);
+  const url = `https://wa.me/${normalized}?text=${encodeURIComponent(message)}`;
+
+  window.open(url, "_blank");
+}
+
+/* ---------------------------------------------------------
    SALDI BEREKENEN
 --------------------------------------------------------- */
 async function computeOpenBalances(searchTerm = "") {
   const { data: users } = await supabase
     .from("users")
-    .select("id, name")
+    .select("id, name, phone_number")
     .order("name", { ascending: true });
 
   const { data: rows } = await supabase
@@ -47,6 +101,7 @@ async function computeOpenBalances(searchTerm = "") {
     .map((u) => ({
       id: u.id,
       name: u.name,
+      phone: u.phone_number,
       amount: sum.get(u.id) || 0,
       count: cnt.get(u.id) || 0,
     }))
@@ -62,10 +117,11 @@ async function renderOpenBalances() {
   const search = $("#pb-search")?.value || "";
   const list = await computeOpenBalances(search);
 
-  const rows = list
+  const rowsHTML = list
     .map((u) => {
       const uid = esc(u.id);
       const name = esc(u.name);
+      const phone = esc(u.phone);
       const count = u.count;
       const amount = euro(u.amount);
 
@@ -82,6 +138,7 @@ async function renderOpenBalances() {
           }`
         : "—";
 
+      // Betalen knop
       const btnPay = `
         <button class="btn pb-pay"
           data-id="${uid}"
@@ -91,16 +148,19 @@ async function renderOpenBalances() {
         </button>
       `;
 
+      // Admin extra knoppen
       let adminBtns = "";
       if (ADMIN_MODE) {
         adminBtns += `
-          <button class="btn pb-admin-paid" data-id="${uid}">Betaald</button>
+          <button class="btn pb-admin-paid" data-id="${uid}">
+            Betaald
+          </button>
         `;
         adminBtns += `
-          <button class="btn pb-admin-wa"
-            data-name="${name}"
-            data-link="${GLOBAL_PAYLINK || ""}">
-            Whatsapp
+          <button class="btn pb-admin-wa-user"
+            data-phone="${phone}"
+            data-link="${GLOBAL_PAYLINK}">
+            App sturen
           </button>
         `;
       }
@@ -117,10 +177,10 @@ async function renderOpenBalances() {
     })
     .join("");
 
-  $("#pb-rows").innerHTML = rows;
+  $("#pb-rows").innerHTML = rowsHTML;
 
   /* ---------------------------------------------------------
-     EVENTS BINDEN
+     EVENT LISTENERS
   --------------------------------------------------------- */
 
   // Betalen
@@ -141,22 +201,12 @@ async function renderOpenBalances() {
     btn.addEventListener("click", () => pbMarkPaid(btn.dataset.id));
   });
 
-  // Admin: WhatsApp
-  document.querySelectorAll(".pb-admin-wa").forEach((btn) => {
+  // Admin: WhatsApp naar user
+  document.querySelectorAll(".pb-admin-wa-user").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const msg = `Hola!!!
-Het is heus het is waar, het moment is daar. 
-Bij deze het betaalverzoek voor de drankjes uit de WI-koelkast, bij 40-45.
-
-${btn.dataset.link}
-
-Alvast bedankt!!
-Nick Jonker`;
-
-      window.open(
-        `https://wa.me/?text=${encodeURIComponent(msg)}`,
-        "_blank"
-      );
+      const phone = btn.dataset.phone;
+      const link = btn.dataset.link;
+      openWhatsappToUser(phone, link);
     });
   });
 
@@ -201,20 +251,18 @@ window.pbMarkPaid = async (userId) => {
    BETAALLINK LADEN
 --------------------------------------------------------- */
 async function loadGlobalPayLink() {
-  try {
-    const { data } = await supabase
-      .from("view_payment_link_latest")
-      .select("link")
-      .maybeSingle();
-    GLOBAL_PAYLINK = data?.link || null;
-  } catch {
-    GLOBAL_PAYLINK = null;
-  }
+  const { data } = await supabase
+    .from("view_payment_link_latest")
+    .select("link")
+    .maybeSingle();
+
+  GLOBAL_PAYLINK = data?.link || null;
 }
 
 /* ---------------------------------------------------------
    FLAG FUNCTIES
 --------------------------------------------------------- */
+
 async function flagPaymentAttempt(userId) {
   const ts = new Date().toISOString();
   PAYMENT_FLAGS.set(userId, ts);
@@ -227,11 +275,14 @@ async function flagPaymentAttempt(userId) {
 
 async function loadPaymentFlags() {
   PAYMENT_FLAGS.clear();
+
   const { data } = await supabase
     .from("payment_flags")
     .select("user_id, attempted_at");
 
-  for (const r of data || []) PAYMENT_FLAGS.set(r.user_id, r.attempted_at);
+  for (const r of data || []) {
+    PAYMENT_FLAGS.set(r.user_id, r.attempted_at);
+  }
 }
 
 window.pbClearFlag = async (userId) => {
