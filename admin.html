@@ -41,7 +41,7 @@
   </header>
 
   <!-- ========================= -->
-  <!-- LOGIN SECTIE (STAP 5A)   -->
+  <!-- LOGIN SECTIE              -->
   <!-- ========================= -->
   <div id="login-section" class="content-wrapper" style="display:none;">
     <h1>🔐 Admin login</h1>
@@ -51,10 +51,19 @@
       id="auth-email"
       class="input"
       placeholder="Emailadres"
+      autocomplete="username"
+    />
+
+    <input
+      type="password"
+      id="auth-password"
+      class="input"
+      placeholder="Wachtwoord"
+      autocomplete="current-password"
     />
 
     <button id="btn-login" class="btn">
-      Stuur magic link
+      Inloggen
     </button>
 
     <p id="auth-msg"></p>

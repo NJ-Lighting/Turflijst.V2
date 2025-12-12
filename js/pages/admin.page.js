@@ -4,7 +4,7 @@ import { supabase } from '../supabase.client.js';
 import { fetchUserMetrics } from '../api/metrics.js';
 
 /* ---------------------------------------------------------
-   AUTH / LOGIN (STAP 5)
+   AUTH / LOGIN (EMAIL + WACHTWOORD)
 --------------------------------------------------------- */
 function showLoginUI() {
   const login = document.getElementById('login-section');
@@ -15,18 +15,24 @@ function showLoginUI() {
 
   btn?.addEventListener('click', async () => {
     const email = document.getElementById('auth-email')?.value?.trim();
-    if (!email) {
-      if (msg) msg.textContent = 'Voer een geldig e-mailadres in';
+    const password = document.getElementById('auth-password')?.value;
+
+    if (!email || !password) {
+      if (msg) msg.textContent = 'Email en wachtwoord zijn verplicht';
       return;
     }
 
-    if (msg) msg.textContent = 'Magic link verzenden…';
+    if (msg) msg.textContent = 'Inloggen…';
 
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
     if (error) {
-      if (msg) msg.textContent = `Fout: ${error.message}`;
+      if (msg) msg.textContent = '❌ Onjuist email of wachtwoord';
     } else {
-      if (msg) msg.textContent = 'Magic link verzonden! Check je mail.';
+      location.reload();
     }
   });
 }
@@ -78,10 +84,7 @@ async function loadUsers() {
       .from('users')
       .select('id, name, phone, "WIcreations"')
       .order('name', { ascending: true });
-    if (uErr) {
-      console.error('users load error:', uErr);
-      return toast('❌ Kan gebruikers niet laden');
-    }
+    if (uErr) return toast('❌ Kan gebruikers niet laden');
 
     const balances = new Map();
     try {
@@ -94,13 +97,12 @@ async function loadUsers() {
         .from('drinks')
         .select('user_id, price_at_purchase, paid')
         .or('paid.eq.false,paid.is.null');
-      const tmp = {};
       for (const d of (drinks || [])) {
-        const uid = d.user_id;
-        const price = Number(d?.price_at_purchase) || 0;
-        tmp[uid] = (tmp[uid] || 0) + price;
+        balances.set(
+          d.user_id,
+          (balances.get(d.user_id) || 0) + Number(d.price_at_purchase || 0)
+        );
       }
-      for (const uid of Object.keys(tmp)) balances.set(uid, tmp[uid]);
     }
 
     const rows = (users || []).map(u => {
@@ -122,8 +124,7 @@ async function loadUsers() {
     }).join('');
 
     $('#tbl-users') && ($('#tbl-users').innerHTML = rows);
-  } catch (err) {
-    console.error('loadUsers error:', err);
+  } catch {
     toast('❌ Kan gebruikers niet laden');
   }
 }
@@ -134,12 +135,11 @@ async function updateUser(userId) {
   const wiChecked = $(`#wic_${userId}`)?.checked ? true : false;
 
   if (!newName) return toast('⚠️ Naam mag niet leeg zijn!');
+
   const payload = { name: newName, WIcreations: wiChecked };
   if (newPhone !== undefined) payload.phone = newPhone;
 
-  const { error } = await supabase.from('users').update(payload).eq('id', userId);
-  if (error) return toast('❌ Fout bij opslaan');
-
+  await supabase.from('users').update(payload).eq('id', userId);
   toast('✅ Gegevens opgeslagen');
   await loadUsers();
 }
@@ -154,15 +154,14 @@ async function zeroUser(userId) {
 async function markAsPaid(userId) {
   const { data: unpaid } = await supabase
     .from('drinks')
-    .select('id, price_at_purchase')
+    .select('price_at_purchase')
     .eq('user_id', userId)
     .or('paid.eq.false,paid.is.null');
 
   const total = (unpaid || []).reduce((s, d) => s + Number(d.price_at_purchase || 0), 0);
   if (!(total > 0)) return toast('Geen onbetaalde items');
 
-  await supabase
-    .from('drinks')
+  await supabase.from('drinks')
     .update({ paid: true })
     .eq('user_id', userId)
     .or('paid.eq.false,paid.is.null');
