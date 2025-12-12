@@ -4,15 +4,32 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Turf Lijst – Admin</title>
+
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico">
+
   <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/css/nav.css" />
 </head>
+
 <body class="bg-train">
+
   <header class="site-nav" role="banner">
-    <button class="nav-toggle" aria-controls="nav-drawer" aria-expanded="false" aria-label="Menu openen">☰</button>
-    <nav id="nav-drawer" class="nav-drawer" role="navigation" aria-label="Hoofdnavigatie">
+    <button
+      class="nav-toggle"
+      aria-controls="nav-drawer"
+      aria-expanded="false"
+      aria-label="Menu openen"
+    >
+      ☰
+    </button>
+
+    <nav
+      id="nav-drawer"
+      class="nav-drawer"
+      role="navigation"
+      aria-label="Hoofdnavigatie"
+    >
       <a href="/index.html">Home</a>
       <a href="/history.html">Geschiedenis</a>
       <a href="/new-user.html">Nieuwe gebruiker</a>
@@ -23,11 +40,39 @@
     </nav>
   </header>
 
-  <main class="content-wrapper">
+  <!-- ========================= -->
+  <!-- LOGIN SECTIE (STAP 5A)   -->
+  <!-- ========================= -->
+  <div id="login-section" class="content-wrapper" style="display:none;">
+    <h1>🔐 Admin login</h1>
+
+    <input
+      type="email"
+      id="auth-email"
+      class="input"
+      placeholder="Emailadres"
+    />
+
+    <button id="btn-login" class="btn">
+      Stuur magic link
+    </button>
+
+    <p id="auth-msg"></p>
+  </div>
+
+  <!-- ========================= -->
+  <!-- ADMIN CONTENT (AFGESCHERMD) -->
+  <!-- ========================= -->
+  <main
+    class="content-wrapper"
+    id="app-content"
+    style="display:none;"
+  >
     <h1>🔧 Admin</h1>
 
     <section class="section">
       <h2>👥 Gebruikers</h2>
+
       <table class="table">
         <thead>
           <tr>
@@ -44,12 +89,32 @@
 
     <section class="section">
       <h2>🛒 Producten</h2>
+
       <div class="row">
-        <input id="new-product-name" class="input" type="text" placeholder="Productnaam" />
-        <input id="new-product-price" class="input" type="text" placeholder="Verkoopprijs (€)" />
-        <!-- NIEUW: echte upload naar Supabase Storage -->
-        <input id="new-product-image" class="input" type="file" accept="image/*" />
-        <button id="btn-add-product" class="btn">Product toevoegen</button>
+        <input
+          id="new-product-name"
+          class="input"
+          type="text"
+          placeholder="Productnaam"
+        />
+
+        <input
+          id="new-product-price"
+          class="input"
+          type="text"
+          placeholder="Verkoopprijs (€)"
+        />
+
+        <input
+          id="new-product-image"
+          class="input"
+          type="file"
+          accept="image/*"
+        />
+
+        <button id="btn-add-product" class="btn">
+          Product toevoegen
+        </button>
       </div>
 
       <table class="table">
@@ -64,9 +129,15 @@
         <tbody id="tbl-products"></tbody>
       </table>
     </section>
+
+    <button id="btn-logout" class="btn">
+      Logout
+    </button>
   </main>
 
+  <!-- SCRIPTS -->
   <script type="module" src="/js/pages/admin.page.js"></script>
   <script type="module" src="/js/nav.js"></script>
+
 </body>
 </html>
