@@ -194,7 +194,7 @@ async function loadProducts() {
 }
 
 /* ============================================================
-   LOG DRINK (BULK + FIFO) — FIXED FOR YOUR SCHEMA
+   LOG DRINK (BULK + FIFO)
 ============================================================ */
 window.logDrink = async (productId, sellPrice, qty) => {
   const now = Date.now();
@@ -269,7 +269,6 @@ window.logDrink = async (productId, sellPrice, qty) => {
     }
   });
 
-  // INSERT — FIXED (GEEN sell_price_at_purchase meer!)
   const { error: insertErr } = await supabase.from('drinks').insert(rows);
   if (insertErr) {
     console.error("INSERT ERROR:", insertErr);
@@ -279,7 +278,6 @@ window.logDrink = async (productId, sellPrice, qty) => {
     return;
   }
 
-  // STOCK UPDATE
   for (const p of plan) {
     await supabase
       .from('stock_batches')
@@ -295,6 +293,10 @@ window.logDrink = async (productId, sellPrice, qty) => {
 
   await renderTotalsFromMetrics();
   await renderPivotFromMetrics();
+
+  // reset geselecteerde gebruiker na registreren
+  const userSelect = $('#user');
+  if (userSelect) userSelect.value = '';
 
   canUndo = true;
   setUiBusy(false);
