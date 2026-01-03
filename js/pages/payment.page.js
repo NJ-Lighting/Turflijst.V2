@@ -291,7 +291,33 @@ window.pbMarkPaid = async (userId) => {
   if (amount <= 0) return toast("Geen openstaand saldo");
 
   await supabase.from("payments").insert([{ user_id: userId, amount }]);
-  await supabase.from("drinks").delete().eq("user_id", userId);
+  // haal attempted_at op
+const { data: flag } = await supabase
+  .from("payment_flags")
+  .select("attempted_at")
+  .eq("user_id", userId)
+  .maybeSingle();
+
+if (!flag) {
+  toast("⚠️ Geen betaalpoging gevonden");
+  return;
+}
+
+// 1️⃣ betaalde drankjes opruimen (ALLEEN vóór betaalpoging)
+await supabase
+  .from("drinks")
+  .delete()
+  .eq("user_id", userId)
+  .lte("created_at", flag.attempted_at);
+
+// 2️⃣ payment registreren
+await supabase.from("payments").insert([
+  { user_id: userId, amount }
+]);
+
+// 3️⃣ betaalpoging opruimen
+await supabase.from("payment_flags").delete().eq("user_id", userId);
+
   await supabase.from("payment_flags").delete().eq("user_id", userId);
 
   toast(`✅ Betaald: ${euro(amount)}`);
