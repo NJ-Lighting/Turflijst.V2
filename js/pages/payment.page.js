@@ -83,33 +83,66 @@ async function computeOpenBalances(searchTerm = "") {
     .select("id, name, phone")
     .order("name", { ascending: true });
 
-  const { data: rows } = await supabase
-    .from("drinks")
-    .select("user_id, price_at_purchase, products(price)");
+  const [{ data: rows }, { data: flags }] = await Promise.all([
+    supabase
+      .from("drinks")
+      .select("user_id, price_at_purchase, created_at"),
+    supabase
+      .from("payment_flags")
+      .select("user_id, amount, attempted_at")
+  ]);
+
+  // ✅ FLAG MAP (DIT MISSE JE)
+  const flagMap = new Map();
+  (flags || []).forEach(f => {
+    flagMap.set(f.user_id, {
+      amount: Number(f.amount),
+      attempted_at: new Date(f.attempted_at)
+    });
+  });
 
   const sum = new Map();
   const cnt = new Map();
 
   (rows || []).forEach((r) => {
-    const price = Number(r?.price_at_purchase ?? r?.products?.price ?? 0);
-    sum.set(r.user_id, (sum.get(r.user_id) || 0) + price);
+    const price = Number(r.price_at_purchase || 0);
+    const drinkTime = new Date(r.created_at);
+    const flag = flagMap.get(r.user_id);
+
+    if (flag) {
+      // ❗ alleen drankjes NA betaalpoging tellen
+      if (drinkTime > flag.attempted_at) {
+        sum.set(r.user_id, (sum.get(r.user_id) || 0) + price);
+      }
+    } else {
+      // geen betaalpoging → alles tellen
+      sum.set(r.user_id, (sum.get(r.user_id) || 0) + price);
+    }
+
     cnt.set(r.user_id, (cnt.get(r.user_id) || 0) + 1);
   });
 
   const q = searchTerm.trim().toLowerCase();
 
   return (users || [])
-    .map((u) => ({
-      id: u.id,
-      name: u.name,
-      phone: u.phone,
-      amount: sum.get(u.id) || 0,
-      count: cnt.get(u.id) || 0,
-    }))
+    .map((u) => {
+      const flag = flagMap.get(u.id);
+
+      return {
+        id: u.id,
+        name: u.name,
+        phone: u.phone,
+        amount: flag
+          ? flag.amount              // 🔒 VAST BEDRAG
+          : (sum.get(u.id) || 0),    // optelsom alleen zonder flag
+        count: cnt.get(u.id) || 0,
+      };
+    })
     .filter((u) => !q || u.name.toLowerCase().includes(q))
     .filter((u) => u.amount > 0)
     .sort((a, b) => a.name.localeCompare(b.name));
 }
+
 
 /* ---------------------------------------------------------
    TABEL RENDEREN
