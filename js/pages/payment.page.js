@@ -102,40 +102,24 @@ async function computeOpenBalances(searchTerm = "") {
   });
 
   const sum = new Map();
-  const cnt = new Map();
+const cnt = new Map();
 
-  (rows || []).forEach((r) => {
-    const price = Number(r.price_at_purchase || 0);
-    const drinkTime = new Date(r.created_at);
-    const flag = flagMap.get(r.user_id);
-
-    if (flag) {
-      // ❗ alleen drankjes NA betaalpoging tellen
-      if (drinkTime > flag.attempted_at) {
-        sum.set(r.user_id, (sum.get(r.user_id) || 0) + price);
-      }
-    } else {
-      // geen betaalpoging → alles tellen
-      sum.set(r.user_id, (sum.get(r.user_id) || 0) + price);
-    }
-
-    (rows || []).forEach((r) => {
+(rows || []).forEach((r) => {
   const price = Number(r.price_at_purchase || 0);
   const drinkTime = new Date(r.created_at);
   const flag = flagMap.get(r.user_id);
 
   if (flag) {
-    // Alleen drankjes NA betaalpoging tellen
+    // ✅ alleen drankjes NA betaalpoging tellen
     if (drinkTime > flag.attempted_at) {
       sum.set(r.user_id, (sum.get(r.user_id) || 0) + price);
       cnt.set(r.user_id, (cnt.get(r.user_id) || 0) + 1);
     }
   } else {
-    // Geen betaalpoging → alles telt
+    // ✅ geen betaalpoging → alles telt
     sum.set(r.user_id, (sum.get(r.user_id) || 0) + price);
     cnt.set(r.user_id, (cnt.get(r.user_id) || 0) + 1);
   }
-});
 
   });
 
