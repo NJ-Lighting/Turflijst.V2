@@ -86,23 +86,26 @@ export async function loadOpenBalances(tableSel, searchSel) {
       }
 
       // ✅ FIX: gebruik upsert met onConflict=user_id (primary key/unique)
-      const { error } = await supabase
-        .from('payment_flags')
-        .upsert(
-     [{
-        user_id: userId,
-        amount,
-        attempted_at: new Date().toISOString()
-      }],
-        { onConflict: 'user_id' }
-      );
+      // 1️⃣ bestaande betaalpoging verwijderen
+await supabase
+  .from('payment_flags')
+  .delete()
+  .eq('user_id', userId);
 
+// 2️⃣ nieuwe betaalpoging invoegen
+const { error } = await supabase
+  .from('payment_flags')
+  .insert([{
+    user_id: userId,
+    amount,
+    attempted_at: new Date().toISOString()
+  }]);
 
-      // ✅ FIX: maar 1 error-check (oude “er staat al een betaalpoging open” block weg)
-      if (error) {
-        console.error(error);
-        return toast('⚠️ Kan betaalpoging niet opslaan');
-      }
+if (error) {
+  console.error(error);
+  return toast('⚠️ Kan betaalpoging niet opslaan');
+}
+
 
       toast('💸 Betaalpoging gestart');
       await loadOpenBalances(tableSel, searchSel);
