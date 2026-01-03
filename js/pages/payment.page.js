@@ -102,25 +102,31 @@ async function computeOpenBalances(searchTerm = "") {
   });
 
   const sum = new Map();
-const cnt = new Map();
+  const cnt = new Map();
 
-(rows || []).forEach((r) => {
-  const price = Number(r.price_at_purchase || 0);
-  const drinkTime = new Date(r.created_at);
-  const flag = flagMap.get(r.user_id);
+  // ✅ NIEUW: sinds betaalpoging (alleen NA attempted_at)
+  const sinceSum = new Map();
+  const sinceCnt = new Map();
 
-  if (flag) {
-    // ✅ alleen drankjes NA betaalpoging tellen
-    if (drinkTime > flag.attempted_at) {
-      sum.set(r.user_id, (sum.get(r.user_id) || 0) + price);
-      cnt.set(r.user_id, (cnt.get(r.user_id) || 0) + 1);
-    }
-  } else {
-    // ✅ geen betaalpoging → alles telt
-    sum.set(r.user_id, (sum.get(r.user_id) || 0) + price);
+  (rows || []).forEach((r) => {
+    const price = Number(r.price_at_purchase || 0);
+    const drinkTime = new Date(r.created_at);
+    const flag = flagMap.get(r.user_id);
+
+    // count: altijd totaal tellen (baseline liet dit impliciet zo; we houden het logisch stabiel)
     cnt.set(r.user_id, (cnt.get(r.user_id) || 0) + 1);
-  }
 
+    if (flag) {
+      // ✅ alleen drankjes NA betaalpoging tellen voor "Nieuw sinds betaalpoging"
+      if (drinkTime > flag.attempted_at) {
+        sinceSum.set(r.user_id, (sinceSum.get(r.user_id) || 0) + price);
+        sinceCnt.set(r.user_id, (sinceCnt.get(r.user_id) || 0) + 1);
+      }
+      // amount blijft vast via flag.amount (dus sum niet nodig voor flagged users)
+    } else {
+      // ✅ geen betaalpoging → alles telt voor optelsom
+      sum.set(r.user_id, (sum.get(r.user_id) || 0) + price);
+    }
   });
 
   const q = searchTerm.trim().toLowerCase();
@@ -137,6 +143,10 @@ const cnt = new Map();
           ? flag.amount              // 🔒 VAST BEDRAG
           : (sum.get(u.id) || 0),    // optelsom alleen zonder flag
         count: cnt.get(u.id) || 0,
+
+        // ✅ NIEUW: voor 2e regel
+        sinceAmount: sinceSum.get(u.id) || 0,
+        sinceCount: sinceCnt.get(u.id) || 0
       };
     })
     .filter((u) => !q || u.name.toLowerCase().includes(q))
@@ -191,6 +201,19 @@ async function renderOpenBalances() {
         `;
       }
 
+      // ✅ NIEUW: 2e regel (alleen als er een betaalpoging is én er zijn nieuwe drankjes)
+      const subRow = (flagISO && u.sinceAmount > 0)
+        ? `
+          <tr class="sub-row">
+            <td colspan="5" style="font-size:0.9em; opacity:0.75; padding-left:24px">
+              ↳ Nieuw sinds betaalpoging:
+              <strong>${euro(u.sinceAmount)}</strong>
+              (${esc(String(u.sinceCount))})
+            </td>
+          </tr>
+        `
+        : "";
+
       return `
         <tr>
           <td>${name}</td>
@@ -198,7 +221,9 @@ async function renderOpenBalances() {
           <td>${amount}</td>
           <td>${attemptCell}</td>
           <td>${payBtn}${adminBtns}</td>
-        </tr>`;
+        </tr>
+        ${subRow}
+      `;
     })
     .join("");
 
