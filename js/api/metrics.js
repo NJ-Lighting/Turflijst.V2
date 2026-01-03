@@ -6,11 +6,13 @@ export async function fetchUserMetrics(supabase) {
     .order('name', { ascending: true });
   if (uErr) throw uErr;
 
-  // Alleen ONBETAALD (paid=false of NULL), historische prijs
+  // 🔧 AANPASSING:
+  // Alleen drankjes die NOG NIET betaald zijn
+  // (geen paid IS NULL meer, dat breekt het meetmoment)
   const { data: drinks, error: dErr } = await supabase
     .from('drinks')
-    .select('user_id, price_at_purchase, paid')
-    .or('paid.eq.false,paid.is.null');
+    .select('user_id, price_at_purchase')
+    .eq('paid', false);
   if (dErr) throw dErr;
 
   const totals = new Map();
@@ -22,23 +24,21 @@ export async function fetchUserMetrics(supabase) {
     counts.set(uid, (counts.get(uid) || 0) + 1);
   }
 
-  const { data: pays, error: pErr } = await supabase
-    .from('payments')
-    .select('user_id, amount');
-  if (pErr) throw pErr;
-
-  const paidSum = new Map();
-  for (const p of (pays || [])) {
-    const a = toNumber(p?.amount);
-    paidSum.set(p.user_id, (paidSum.get(p.user_id) || 0) + a);
-  }
-
+  // ⛔ payments blijven bestaan, maar worden hier NIET meer verrekend
+  // omdat "paid" op drinks nu leidend is
   const rowsOut = (users || []).map(u => {
-    const total = totals.get(u.id) ?? 0;  // onbetaald
-    const count = counts.get(u.id) ?? 0;  // onbetaald
-    const paid  = paidSum.get(u.id) ?? 0; // som payments
-    const balance = total - paid;
-    return { id: u.id, name: u.name, WIcreations: !!u.WIcreations, total, count, paid, balance };
+    const total = totals.get(u.id) ?? 0;
+    const count = counts.get(u.id) ?? 0;
+    const balance = total;
+
+    return {
+      id: u.id,
+      name: u.name,
+      WIcreations: !!u.WIcreations,
+      total,
+      count,
+      balance
+    };
   });
 
   rowsOut.sort((a, b) => {
@@ -51,20 +51,21 @@ export async function fetchUserMetrics(supabase) {
 
 export async function fetchUserBalances(supabase) {
   const metrics = await fetchUserMetrics(supabase);
-const rows = await Promise.all(
-  (metrics || []).map(async m => {
-    const openSinceLastPayment =
-      await fetchOpenSinceLastPayment(supabase, m.id);
 
-    return {
-      id: m.id,
-      name: m.name,
-      WIcreations: !!m.WIcreations,
-      balance: Math.max(0, toNumber(m.balance)),
-      openSinceLastPayment: Math.max(0, toNumber(openSinceLastPayment)),
-    };
-  })
-);
+  const rows = await Promise.all(
+    (metrics || []).map(async m => {
+      const openSinceLastPayment =
+        await fetchOpenSinceLastPayment(supabase, m.id);
+
+      return {
+        id: m.id,
+        name: m.name,
+        WIcreations: !!m.WIcreations,
+        balance: Math.max(0, toNumber(m.balance)),
+        openSinceLastPayment: Math.max(0, toNumber(openSinceLastPayment)),
+      };
+    })
+  );
 
   rows.sort((a, b) => {
     if (a.WIcreations !== b.WIcreations) return a.WIcreations ? -1 : 1;
@@ -77,7 +78,7 @@ export async function fetchUserDrinkPivot(supabase) {
   const { data: rows, error } = await supabase
     .from('drinks')
     .select('user_id, users(name), products(name)')
-    .or('paid.eq.false,paid.is.null'); // alleen onbetaalde drinks
+    .eq('paid', false); // 🔧 consequent
   if (error) throw error;
 
   const usersMap = new Map();
@@ -103,8 +104,8 @@ export async function fetchUserDrinkPivot(supabase) {
 export async function fetchUserTotalsCurrentPrice(supabase) {
   const { data, error } = await supabase
     .from('drinks')
-    .select('users(name), price_at_purchase, paid')
-    .or('paid.eq.false,paid.is.null');
+    .select('users(name), price_at_purchase')
+    .eq('paid', false); // 🔧
   if (error) throw error;
 
   const totals = new Map();
@@ -148,7 +149,7 @@ export async function fetchOpenSinceLastPayment(supabase, userId) {
     .from('drinks')
     .select('price_at_purchase')
     .eq('user_id', userId)
-    .or('paid.eq.false,paid.is.null');
+    .eq('paid', false); // 🔧 cruciaal
 
   if (lastPaidAt) {
     q = q.gt('created_at', lastPaidAt);
