@@ -181,7 +181,8 @@ function bindEvents() {
     btn.addEventListener("click", async () => {
       const userId = btn.dataset.id;
 
-      await flagPaymentAttempt(userId);
+      const amount = Number(btn.dataset.amount);
+      await flagPaymentAttempt(userId, amount);
       await loadPaymentFlags();
       await renderOpenBalances();
 
@@ -250,19 +251,33 @@ async function loadGlobalPayLink() {
 /* ---------------------------------------------------------
    FLAG FUNCTIES
 --------------------------------------------------------- */
-async function flagPaymentAttempt(userId) {
+async function flagPaymentAttempt(userId, amount) {
   const ts = new Date().toISOString();
 
-  await supabase.from("payment_flags").upsert(
+  const n = Number(amount);
+  if (!Number.isFinite(n) || n <= 0) {
+    toast("⚠️ Ongeldig bedrag");
+    return;
+  }
+
+  const { error } = await supabase.from("payment_flags").upsert(
     {
       user_id: userId,
       attempted_at: ts,
+      amount: n, // ✅ VERPLICHT
     },
     { onConflict: "user_id" }
   );
 
+  if (error) {
+    console.error(error);
+    toast("⚠️ Kan betaalpoging niet opslaan");
+    return;
+  }
+
   PAYMENT_FLAGS.set(userId, ts);
 }
+
 
 async function loadPaymentFlags() {
   PAYMENT_FLAGS.clear();
