@@ -128,59 +128,37 @@ export async function confirmPayment(paymentId) {
   const p = pRow;
   if (!p) throw new Error('Payment niet gevonden');
 
-  // 2) Bereken openstaand totaal en zet drankjes betaald
-  const { data: drinks, error: dErr } = await supabase
+  // ✅ FIX: meetmoment — alleen drankjes t/m payment.created_at
+  const { error: updErr } = await supabase
     .from('drinks')
-    .select('id, price_at_purchase, paid')
+    .update({ paid: true })
     .eq('user_id', p.user_id)
-    .or('paid.eq.false,paid.is.null');
-  if (dErr) throw dErr;
+    .lte('created_at', p.created_at);
+  if (updErr) throw updErr;
 
-  const openTotal = (drinks || []).reduce((s, r) => s + toNumber(r.price_at_purchase), 0);
-
-  if (openTotal > 0) {
-    let { error: updErr } = await supabase
-      .from('drinks')
-      .update({ paid: true })
-      .eq('user_id', p.user_id)
-      .or('paid.eq.false,paid.is.null');
-    if (updErr) throw updErr;
-  }
-
-  // 3) Optioneel: als bestaande payment bedrag 0 was, updaten naar openTotal
-  if (!toNumber(p.amount) && openTotal > 0) {
-    const { error: updPayErr } = await supabase
-      .from('payments')
-      .update({ amount: openTotal })
-      .eq('id', p.id);
-    if (updPayErr) throw updPayErr;
-  }
+  // NB: we updaten payment.amount niet meer op basis van openTotal,
+  // want bij meetmoment betaal je expliciet "wat er tot dat moment open stond".
+  // (en jouw schema heeft geen payment->drink link om dit anders te modelleren)
 }
 
 export async function addDirectPayment(userId, amount) {
-  // Zet eventuele openstaande drankjes betaald en schrijf een payment record
-  const { data: drinks, error: dErr } = await supabase
+  // ✅ FIX: meetmoment — eerst payment insert, daarna drinks <= insert.created_at
+  const { data: insRow, error: insErr } = await supabase
+    .from('payments')
+    .insert([{
+      user_id: userId,
+      amount: toNumber(amount)
+    }])
+    .select('id, user_id, amount, created_at')
+    .single();
+  if (insErr) throw insErr;
+
+  const { error: updErr } = await supabase
     .from('drinks')
-    .select('id, price_at_purchase, paid')
+    .update({ paid: true })
     .eq('user_id', userId)
-    .or('paid.eq.false,paid.is.null');
-  if (dErr) throw dErr;
-
-  const openTotal = (drinks || []).reduce((s, r) => s + toNumber(r.price_at_purchase), 0);
-  if (openTotal > 0) {
-    let { error: updErr } = await supabase
-      .from('drinks')
-      .update({ paid: true })
-      .eq('user_id', userId)
-      .or('paid.eq.false,paid.is.null');
-    if (updErr) throw updErr;
-  }
-
-  const finalAmount = openTotal || toNumber(amount);
-  const { error } = await supabase.from('payments').insert([{
-    user_id: userId, amount: finalAmount
-  }]);
-  if (error) throw error;
+    .lte('created_at', insRow.created_at);
+  if (updErr) throw updErr;
 }
 
 export async function deletePayment(paymentId) {
