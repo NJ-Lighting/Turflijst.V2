@@ -258,7 +258,15 @@ export async function loadOpenPerUser(tableSel = '#tbl-open-users') {
   const rows = await fetchUserBalances(supabase); // [{id,name,balance}]
   const html = (rows || [])
     .sort((a,b)=> a.name.localeCompare(b.name,'nl'))
-    .map(r => `<tr><td>${esc(r.name)}</td><td class="right">${euro(r.balance)}</td></tr>`)
+    .map(r => `<tr><td>${esc(r.name)}</td><td class="right">
+  ${euro(
+    Math.max(
+      0,
+      r.balance - r.openSinceLastPayment
+    )
+  )}
+</td>
+</tr>`)
     .join('');
   el.innerHTML = html || `<tr><td colspan="2">—</td></tr>`;
 }
