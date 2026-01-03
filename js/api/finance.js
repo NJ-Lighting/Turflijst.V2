@@ -89,13 +89,14 @@ export async function loadOpenBalances(tableSel, searchSel) {
       const { error } = await supabase
         .from('payment_flags')
         .upsert(
-          {
-            user_id: userId,
-            amount,
-            attempted_at: new Date().toISOString()
-          },
-          { onConflict: 'user_id' }
-        );
+     [{
+        user_id: userId,
+        amount,
+        attempted_at: new Date().toISOString()
+      }],
+        { onConflict: 'user_id' }
+      );
+
 
       // ✅ FIX: maar 1 error-check (oude “er staat al een betaalpoging open” block weg)
       if (error) {
