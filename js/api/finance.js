@@ -30,68 +30,90 @@ export async function loadUsersToSelects(filterSel, addSel) {
    Open balances (payment page)
 ========================= */
 export async function loadOpenBalances(tableSel, searchSel) {
-  const rows = await fetchUserBalances(supabase); // [{id,name,balance}]
+  const rows = await fetchUserBalances(supabase);
   const q = (searchSel && $(searchSel)?.value?.trim().toLowerCase()) || '';
   const list = rows.filter(r => !q || r.name.toLowerCase().includes(q));
 
   const html = list.map(r => `
-  <tr>
-    <td>${esc(r.name)}</td>
-    <td class="right">
-      ${euro(
+    <tr>
+      <td>${esc(r.name)}</td>
+      <td class="right">
+        ${euro(
+          r.openSinceLastPayment > 0
+            ? r.balance - r.openSinceLastPayment
+            : r.balance
+        )}
+      </td>
+      <td style="text-align:center">
+        <button class="btn"
+          onclick="uiSendForUser('${esc(r.id)}','${esc(r.name)}')">
+          Verstuur verzoek
+        </button>
+      </td>
+    </tr>
+
+    ${
       r.openSinceLastPayment > 0
-      ? r.balance - r.openSinceLastPayment
-      : r.balance
-      )}
-    </td>
+        ? `
+          <tr class="sub-row">
+            <td colspan="3" style="font-size:0.9em; opacity:0.75; padding-left:24px">
+              ↳ Nieuw sinds betaalpoging:
+              <strong>${euro(r.openSinceLastPayment)}</strong>
+            </td>
+          </tr>
+        `
+        : ''
+    }
+  `).join('');
 
-    <td style="text-align:center">
-      <button class="btn"
-        onclick="uiSendForUser('${esc(r.id)}','${esc(r.name)}')">
-        Verstuur verzoek
-      </button>
-    </td>
-  </tr>
-
-  ${
-    r.openSinceLastPayment > 0
-      ? `
-        <tr class="sub-row">
-          <td colspan="3" style="font-size:0.9em; opacity:0.75; padding-left:24px">
-            ↳ Nieuw sinds laatste betaling:
-            <strong>${euro(r.openSinceLastPayment)}</strong>
-          </td>
-        </tr>
-      `
-      : ''
+  if ($(tableSel)) {
+    $(tableSel).innerHTML =
+      html || `<tr><td colspan="3">Geen openstaande saldi</td></tr>`;
   }
-`).join('');
 
-
-  if ($(tableSel)) $(tableSel).innerHTML = html || `<tr><td colspan="3">Geen openstaande saldi</td></tr>`;
-
-  // helper
+  /* =========================
+     Betaalpoging starten
+     → payment_flags
+  ========================= */
   if (typeof window !== 'undefined') {
     window.uiSendForUser = async (userId, userName) => {
       const amountStr = prompt(`Bedrag voor ${userName}? (bijv. 5,00)`, '');
       if (amountStr === null) return;
-      const amt = Number(String(amountStr).replace(',', '.'));
-      if (!Number.isFinite(amt) || amt <= 0) return toast('⚠️ Ongeldig bedrag');
 
-      // Je schema heeft geen requests/status; we informeren de gebruiker.
-      toast('ℹ️ Betaalverzoeken niet geconfigureerd in deze database. Gebruik "Markeer als betaald" of voeg een directe betaling toe.');
-      // (Geen DB-mutatie hier)
+      const amount = Number(String(amountStr).replace(',', '.'));
+      if (!Number.isFinite(amount) || amount <= 0) {
+        return toast('⚠️ Ongeldig bedrag');
+      }
+
+      // 🔧 NIEUW: betaalpoging vastleggen
+      const { error } = await supabase
+        .from('payment_flags')
+        .insert([{
+          user_id: userId,
+          amount,
+          attempted_at: new Date().toISOString()
+        }]);
+
+      if (error) {
+        console.error(error);
+        return toast('⚠️ Er staat al een betaalpoging open');
+      }
+
+      toast('💸 Betaalpoging gestart');
+      await loadOpenBalances(tableSel, searchSel);
     };
   }
 
   if (searchSel && $(searchSel) && !$(searchSel).__bound) {
     $(searchSel).__bound = true;
-    $(searchSel).addEventListener('input', () => loadOpenBalances(tableSel, searchSel));
+    $(searchSel).addEventListener('input', () =>
+      loadOpenBalances(tableSel, searchSel)
+    );
   }
 }
 
 /* =========================
-   Payments listing (schema-safe)
+   Payments listing (ongewijzigd)
 ========================= */
 export async function loadPayments({ listAllSel, listSentSel, listConfirmedSel, filterUserSel } = {}) {
   const userId = filterUserSel && $(filterUserSel)?.value || '';
@@ -118,12 +140,10 @@ export async function loadPayments({ listAllSel, listSentSel, listConfirmedSel, 
 
   if (listAllSel && $(listAllSel)) $(listAllSel).innerHTML = rowsAll || `Geen betalingen`;
 
-  // Omdat er geen status-kolom is, zijn "sent/confirmed" lijstjes leeg/NIET gesegmenteerd:
   if (listSentSel && $(listSentSel)) $(listSentSel).innerHTML = `—`;
   if (listConfirmedSel && $(listConfirmedSel)) $(listConfirmedSel).innerHTML = `—`;
 
-  // delete-knoppen
-  (document.querySelectorAll('[data-del-id]') || []).forEach(btn => {
+  document.querySelectorAll('[data-del-id]').forEach(btn => {
     if (btn.__bind) return;
     btn.__bind = true;
     btn.addEventListener('click', async () => {
@@ -134,55 +154,44 @@ export async function loadPayments({ listAllSel, listSentSel, listConfirmedSel, 
 }
 
 /* =========================
-   Payments actions (schema-safe)
+   Betaling bevestigen
 ========================= */
-export async function sendPaymentRequest(/* userId, amount */) {
-  // In jouw schema bestaan geen request/status kolommen.
-  toast('ℹ️ Betaalverzoeken niet geconfigureerd in deze database.');
-}
-
-export async function confirmPayment(paymentId) {
-  // 1) Haal payment + user op (zonder status kolom)
-  const { data: pRow, error: pErr } = await supabase
-    .from('payments')
-    .select('id, user_id, amount, created_at')
-    .eq('id', paymentId)
+export async function confirmPayment(userId) {
+  // 🔧 NIEUW: betaalpoging ophalen
+  const { data: flag, error } = await supabase
+    .from('payment_flags')
+    .select('amount, attempted_at')
+    .eq('user_id', userId)
     .maybeSingle();
-  if (pErr) throw pErr;
-  const p = pRow;
-  if (!p) throw new Error('Payment niet gevonden');
 
-  // ✅ FIX: meetmoment — alleen drankjes t/m payment.created_at
-  const { error: updErr } = await supabase
-    .from('drinks')
-    .update({ paid: true })
-    .eq('user_id', p.user_id)
-    .lte('created_at', p.created_at);
-  if (updErr) throw updErr;
+  if (error || !flag) {
+    return toast('⚠️ Geen betaalpoging gevonden');
+  }
 
-  // NB: we updaten payment.amount niet meer op basis van openTotal,
-  // want bij meetmoment betaal je expliciet "wat er tot dat moment open stond".
-  // (en jouw schema heeft geen payment->drink link om dit anders te modelleren)
-}
-
-export async function addDirectPayment(userId, amount) {
-  // ✅ FIX: meetmoment — eerst payment insert, daarna drinks <= insert.created_at
-  const { data: insRow, error: insErr } = await supabase
-    .from('payments')
-    .insert([{
-      user_id: userId,
-      amount: toNumber(amount)
-    }])
-    .select('id, user_id, amount, created_at')
-    .single();
-  if (insErr) throw insErr;
-
+  // 🔧 drinks t/m attempted_at → paid
   const { error: updErr } = await supabase
     .from('drinks')
     .update({ paid: true })
     .eq('user_id', userId)
-    .lte('created_at', insRow.created_at);
+    .lte('created_at', flag.attempted_at);
   if (updErr) throw updErr;
+
+  // 🔧 payment aanmaken met vast bedrag
+  const { error: payErr } = await supabase
+    .from('payments')
+    .insert([{
+      user_id: userId,
+      amount: flag.amount
+    }]);
+  if (payErr) throw payErr;
+
+  // 🔧 betaalpoging opruimen
+  await supabase
+    .from('payment_flags')
+    .delete()
+    .eq('user_id', userId);
+
+  toast('✅ Betaling afgerond');
 }
 
 export async function deletePayment(paymentId) {
@@ -191,7 +200,7 @@ export async function deletePayment(paymentId) {
 }
 
 /* =========================
-   KPI & rapportage
+   ALLES HIERONDER: ONGEWIJZIGD
 ========================= */
 export async function loadKPIs(containerSel = '#kpi-cards') {
   const el = $(containerSel); if (!el) return;
