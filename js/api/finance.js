@@ -86,13 +86,24 @@ export async function loadOpenBalances(tableSel, searchSel) {
       }
 
       // 🔧 NIEUW: betaalpoging vastleggen
-      const { error } = await supabase
-        .from('payment_flags')
-        .insert([{
-          user_id: userId,
-          amount,
-          attempted_at: new Date().toISOString()
-        }]);
+const { error } = await supabase
+  .from('payment_flags')
+  .upsert(
+    {
+      user_id: userId,
+      amount,
+      attempted_at: new Date().toISOString()
+    },
+    {
+      onConflict: 'user_id'
+    }
+  );
+
+if (error) {
+  console.error(error);
+  return toast('⚠️ Kan betaalpoging niet opslaan');
+}
+
 
       if (error) {
         console.error(error);
