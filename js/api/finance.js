@@ -85,29 +85,22 @@ export async function loadOpenBalances(tableSel, searchSel) {
         return toast('⚠️ Ongeldig bedrag');
       }
 
-      // 🔧 NIEUW: betaalpoging vastleggen
-const { error } = await supabase
-  .from('payment_flags')
-  .upsert(
-    {
-      user_id: userId,
-      amount,
-      attempted_at: new Date().toISOString()
-    },
-    {
-      onConflict: 'user_id'
-    }
-  );
+      // ✅ FIX: gebruik upsert met onConflict=user_id (primary key/unique)
+      const { error } = await supabase
+        .from('payment_flags')
+        .upsert(
+          {
+            user_id: userId,
+            amount,
+            attempted_at: new Date().toISOString()
+          },
+          { onConflict: 'user_id' }
+        );
 
-if (error) {
-  console.error(error);
-  return toast('⚠️ Kan betaalpoging niet opslaan');
-}
-
-
+      // ✅ FIX: maar 1 error-check (oude “er staat al een betaalpoging open” block weg)
       if (error) {
         console.error(error);
-        return toast('⚠️ Er staat al een betaalpoging open');
+        return toast('⚠️ Kan betaalpoging niet opslaan');
       }
 
       toast('💸 Betaalpoging gestart');
@@ -168,14 +161,18 @@ export async function loadPayments({ listAllSel, listSentSel, listConfirmedSel, 
    Betaling bevestigen
 ========================= */
 export async function confirmPayment(userId) {
-  // 🔧 NIEUW: betaalpoging ophalen
-  const { data: flag, error } = await supabase
+  // ✅ FIX: haal betaalpoging op i.p.v. upsert
+  const { data: flag, error: fErr } = await supabase
     .from('payment_flags')
     .select('amount, attempted_at')
     .eq('user_id', userId)
     .maybeSingle();
 
-  if (error || !flag) {
+  if (fErr) {
+    console.error(fErr);
+    return toast('⚠️ Fout bij ophalen betaalpoging');
+  }
+  if (!flag) {
     return toast('⚠️ Geen betaalpoging gevonden');
   }
 
@@ -197,10 +194,15 @@ export async function confirmPayment(userId) {
   if (payErr) throw payErr;
 
   // 🔧 betaalpoging opruimen
-  await supabase
+  const { error: delErr } = await supabase
     .from('payment_flags')
     .delete()
     .eq('user_id', userId);
+
+  if (delErr) {
+    console.error(delErr);
+    // niet blokkeren: betaling is al gelogd & drinks paid gezet
+  }
 
   toast('✅ Betaling afgerond');
 }
