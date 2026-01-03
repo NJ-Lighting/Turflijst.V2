@@ -35,14 +35,31 @@ export async function loadOpenBalances(tableSel, searchSel) {
   const list = rows.filter(r => !q || r.name.toLowerCase().includes(q));
 
   const html = list.map(r => `
-    <tr>
-      <td>${esc(r.name)}</td>
-      <td class="right">${euro(r.balance)}</td>
-      <td style="text-align:center">
-        <button class="btn" onclick="uiSendForUser('${esc(r.id)}','${esc(r.name)}')">Verstuur verzoek</button>
-      </td>
-    </tr>
-  `).join('');
+  <tr>
+    <td>${esc(r.name)}</td>
+    <td class="right">${euro(r.balance)}</td>
+    <td style="text-align:center">
+      <button class="btn"
+        onclick="uiSendForUser('${esc(r.id)}','${esc(r.name)}')">
+        Verstuur verzoek
+      </button>
+    </td>
+  </tr>
+
+  ${
+    r.openSinceLastPayment > 0
+      ? `
+        <tr class="sub-row">
+          <td colspan="3" style="font-size:0.9em; opacity:0.75; padding-left:24px">
+            ↳ Nieuw sinds laatste betaling:
+            <strong>${euro(r.openSinceLastPayment)}</strong>
+          </td>
+        </tr>
+      `
+      : ''
+  }
+`).join('');
+
 
   if ($(tableSel)) $(tableSel).innerHTML = html || `<tr><td colspan="3">Geen openstaande saldi</td></tr>`;
 

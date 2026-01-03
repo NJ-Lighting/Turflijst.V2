@@ -51,12 +51,21 @@ export async function fetchUserMetrics(supabase) {
 
 export async function fetchUserBalances(supabase) {
   const metrics = await fetchUserMetrics(supabase);
-  const rows = (metrics || []).map(m => ({
-    id: m.id,
-    name: m.name,
-    WIcreations: !!m.WIcreations,
-    balance: Math.max(0, toNumber(m.balance)),
-  }));
+const rows = await Promise.all(
+  (metrics || []).map(async m => {
+    const openSinceLastPayment =
+      await fetchOpenSinceLastPayment(supabase, m.id);
+
+    return {
+      id: m.id,
+      name: m.name,
+      WIcreations: !!m.WIcreations,
+      balance: Math.max(0, toNumber(m.balance)),
+      openSinceLastPayment: Math.max(0, toNumber(openSinceLastPayment)),
+    };
+  })
+);
+
   rows.sort((a, b) => {
     if (a.WIcreations !== b.WIcreations) return a.WIcreations ? -1 : 1;
     return a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' });
@@ -113,4 +122,46 @@ export async function fetchUserTotalsCurrentPrice(supabase) {
 function toNumber(x) {
   const n = Number(x);
   return Number.isFinite(n) ? n : 0;
+}
+
+export async function fetchLastPaymentAt(supabase, userId) {
+  const { data, error } = await supabase
+    .from('payments')
+    .select('created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('[fetchLastPaymentAt]', error);
+    return null;
+  }
+
+  return data?.created_at || null;
+}
+
+export async function fetchOpenSinceLastPayment(supabase, userId) {
+  const lastPaidAt = await fetchLastPaymentAt(supabase, userId);
+
+  let q = supabase
+    .from('drinks')
+    .select('price_at_purchase')
+    .eq('user_id', userId)
+    .or('paid.eq.false,paid.is.null');
+
+  if (lastPaidAt) {
+    q = q.gt('created_at', lastPaidAt);
+  }
+
+  const { data, error } = await q;
+  if (error) {
+    console.error('[fetchOpenSinceLastPayment]', error);
+    return 0;
+  }
+
+  return (data || []).reduce(
+    (sum, r) => sum + Number(r.price_at_purchase || 0),
+    0
+  );
 }
