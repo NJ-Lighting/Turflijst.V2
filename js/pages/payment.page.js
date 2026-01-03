@@ -202,17 +202,22 @@ async function renderOpenBalances() {
       }
 
       // ✅ NIEUW: 2e regel (alleen als er een betaalpoging is én er zijn nieuwe drankjes)
-      const subRow = (flagISO && u.sinceAmount > 0)
-        ? `
-          <tr class="sub-row">
-            <td colspan="5" style="font-size:0.9em; opacity:0.75; padding-left:24px">
-              ↳ Nieuw sinds betaalpoging:
-              <strong>${euro(u.sinceAmount)}</strong>
-              (${esc(String(u.sinceCount))})
-            </td>
-          </tr>
-        `
-        : "";
+      const subRow = (flagISO && (u.sinceAmount > 0 || u.sinceCount > 0))
+  ? `
+    <tr class="sub-row">
+      <td colspan="5" style="font-size:0.9em; opacity:0.75; padding-left:24px">
+        ↳ Nieuw sinds betaalpoging:
+        ${
+          u.sinceAmount > 0
+            ? `<strong>${euro(u.sinceAmount)}</strong>`
+            : `<strong>€0,00</strong>`
+        }
+        (${esc(String(u.sinceCount))})
+      </td>
+    </tr>
+  `
+  : "";
+
 
       return `
         <tr>
