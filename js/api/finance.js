@@ -37,7 +37,14 @@ export async function loadOpenBalances(tableSel, searchSel) {
   const html = list.map(r => `
   <tr>
     <td>${esc(r.name)}</td>
-    <td class="right">${euro(r.balance)}</td>
+    <td class="right">
+      ${euro(
+      r.openSinceLastPayment > 0
+      ? r.balance - r.openSinceLastPayment
+      : r.balance
+      )}
+    </td>
+
     <td style="text-align:center">
       <button class="btn"
         onclick="uiSendForUser('${esc(r.id)}','${esc(r.name)}')">
