@@ -383,9 +383,11 @@ export async function addDeposit(amountSel, noteSel, onDone) {
     .insert([payload]);
 
   if (error) {
-    console.error('[addDeposit] error', error);
-    return toast('❌ Fout bij opslaan');
-  }
+  console.error('[addDeposit] error', error);
+  console.error('[addDeposit] error JSON', JSON.stringify(error, null, 2));
+  return toast('❌ Fout bij opslaan');
+}
+
 
   if (amountSel && $(amountSel)) $(amountSel).value = '';
   if (noteSel && $(noteSel)) $(noteSel).value = '';
