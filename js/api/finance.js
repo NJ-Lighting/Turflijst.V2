@@ -360,31 +360,73 @@ export async function loadMonthlyStats(containerSel = '#month-stats') {
 export async function addDeposit(amountSel, noteSel, onDone) {
   const amountStr = amountSel && $(amountSel)?.value || '';
   const amount = Number(String(amountStr).replace(',', '.'));
-  if (!Number.isFinite(amount) || amount <= 0) return toast('⚠️ Ongeldig bedrag');
+  const note = noteSel && $(noteSel)?.value?.trim();
 
-  const payload = { amount, created_at: new Date().toISOString() };
-  const { error } = await supabase.from('deposits').insert([payload]);
-  if (error) { console.error('[addDeposit] error', error); return toast('❌ Fout bij opslaan'); }
+  // Bedrag moet numeriek zijn (positief of negatief)
+  if (!Number.isFinite(amount)) {
+    return toast('⚠️ Ongeldig bedrag');
+  }
+
+  // Notitie altijd verplicht (zeker bij negatief)
+  if (!note) {
+    return toast('⚠️ Notitie verplicht');
+  }
+
+  const payload = {
+    amount,
+    note,
+    created_at: new Date().toISOString()
+  };
+
+  const { error } = await supabase
+    .from('deposits')
+    .insert([payload]);
+
+  if (error) {
+    console.error('[addDeposit] error', error);
+    return toast('❌ Fout bij opslaan');
+  }
 
   if (amountSel && $(amountSel)) $(amountSel).value = '';
   if (noteSel && $(noteSel)) $(noteSel).value = '';
+
   if (onDone) await onDone();
-  toast('♻️ Statiegeld geregistreerd');
+
+  toast(
+    amount >= 0
+      ? '♻️ Statiegeld geregistreerd'
+      : '🧾 Statiegeld afgeboekt (correctie)'
+  );
 }
 
-export async function loadDepositMetrics(inSel='#kpi-dep-in', usedSel='#kpi-dep-used', availSel='#kpi-dep-avail') {
-  const { data: depRows } = await supabase.from('deposits').select('amount');
-  const inSum = (depRows||[]).reduce((s,r)=>s+toNumber(r.amount),0);
-  let used=0;
+export async function loadDepositMetrics(
+  inSel = '#kpi-dep-in',
+  usedSel = '#kpi-dep-used',
+  availSel = '#kpi-dep-avail'
+) {
+  const { data: depRows } = await supabase
+    .from('deposits')
+    .select('amount');
+
+  const depositTotal = (depRows || [])
+    .reduce((s, r) => s + toNumber(r.amount), 0);
+
+  let bufferUsed = 0;
   try {
-    const { data: bRows } = await supabase.from('stock_batches').select('buffer_used');
-    used = (bRows||[]).reduce((s,r)=>s+toNumber(r.buffer_used),0);
+    const { data: bRows } = await supabase
+      .from('stock_batches')
+      .select('buffer_used');
+    bufferUsed = (bRows || [])
+      .reduce((s, r) => s + toNumber(r.buffer_used), 0);
   } catch {}
-  const avail = Math.max(0, inSum - used);
-  if ($(inSel)) $(inSel).textContent = euro(inSum);
-  if ($(usedSel)) $(usedSel).textContent = euro(used);
-  if ($(availSel)) $(availSel).textContent = euro(avail);
+
+  const bufferAvail = depositTotal - bufferUsed;
+
+  if ($(inSel)) $(inSel).textContent = euro(depositTotal);
+  if ($(usedSel)) $(usedSel).textContent = euro(bufferUsed);
+  if ($(availSel)) $(availSel).textContent = euro(bufferAvail);
 }
+
 
 /* =========================
    UI helpers voor finance.page.js
